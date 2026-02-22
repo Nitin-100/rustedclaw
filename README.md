@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://em-content.zobj.net/source/twitter/408/lobster_1f99e.png">
-    <img src="https://em-content.zobj.net/source/twitter/408/lobster_1f99e.png" width="100" alt="RustedClaw">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo.svg" width="120" alt="RustedClaw">
   </picture>
 </p>
 
@@ -16,15 +16,6 @@
   <a href="#-the-landscape"><img src="https://img.shields.io/badge/RAM-~1_MB_container-critical?style=for-the-badge" alt="RAM"></a>
   <a href="#-the-landscape"><img src="https://img.shields.io/badge/binary-3.9_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
-</p>
-
----
-
-<!-- Replace with your own GIF/screenshot — record with OBS or LICEcap -->
-<p align="center">
-  <img src="https://placehold.co/800x450/1a1a2e/e94560?text=🦞+RustedClaw+Web+UI+Demo&font=inter" width="720" alt="RustedClaw Web UI demo">
-  <br>
-  <sub>Built-in Web UI — chat, memory, tools, routines. No frontend build step. No sign-up.</sub>
 </p>
 
 ---
@@ -50,7 +41,6 @@ There are several open-source AI agent runtimes. Here's how they compare:
 | **Memory** | SQLite + FTS5 | file-based | SQLite + vector | PostgreSQL + pgvector | in-memory |
 | **WASM Sandbox** | ✅ (opt-in) | ✅ | ✅ | ✅ | ❌ |
 | **License** | MIT | MIT | MIT | MIT + Apache-2.0 | Apache-2.0 |
-| **Stars** | 🆕 | ~1.7k | ~16.6k | ~2.8k | ~363 |
 | **Deployment** | Copy 1 file | Copy 1 file | Copy 1 file | Docker + PostgreSQL | npm install → pray |
 
 <sub>¹ ZeroClaw self-reported for `--help`/`status` (exit immediately). Gateway idle RAM not published. Binary from macOS arm64 release.<br>

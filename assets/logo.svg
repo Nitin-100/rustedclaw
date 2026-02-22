@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Rusted metal gradient -->
+    <linearGradient id="rust" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C85A17"/>
+      <stop offset="35%" stop-color="#A0522D"/>
+      <stop offset="70%" stop-color="#8B4513"/>
+      <stop offset="100%" stop-color="#6B3410"/>
+    </linearGradient>
+    <!-- Aged bronze for accents -->
+    <linearGradient id="bronze" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#CD7F32"/>
+      <stop offset="50%" stop-color="#B87333"/>
+      <stop offset="100%" stop-color="#8C5828"/>
+    </linearGradient>
+    <!-- Dark steel for crossbar -->
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A4A4A"/>
+      <stop offset="50%" stop-color="#3A3A3A"/>
+      <stop offset="100%" stop-color="#2A2A2A"/>
+    </linearGradient>
+    <!-- Glow for edge highlights -->
+    <linearGradient id="edge" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E8A065"/>
+      <stop offset="100%" stop-color="#C85A17"/>
+    </linearGradient>
+    <!-- Drop shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="2" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+    <!-- Subtle texture noise -->
+    <filter id="aged">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" result="noise"/>
+      <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+      <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="textured"/>
+      <feComposite in="textured" in2="SourceGraphic" operator="in"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle — dark forge -->
+  <circle cx="256" cy="256" r="240" fill="#1A1A1E" stroke="#3A3028" stroke-width="6"/>
+  <circle cx="256" cy="256" r="232" fill="none" stroke="#4A3828" stroke-width="1.5" stroke-dasharray="8,6" opacity="0.5"/>
+
+  <!-- Ancient Bagh Nakh (Tiger Claw) weapon -->
+  <g filter="url(#shadow)" transform="translate(256,256) rotate(-15) translate(-256,-256)">
+
+    <!-- Crossbar / grip — the horizontal bar fighters held in their fist -->
+    <rect x="130" y="270" width="252" height="40" rx="10" ry="10" fill="url(#steel)" filter="url(#aged)"/>
+    <!-- Grip rivet details -->
+    <circle cx="170" cy="290" r="6" fill="#555" stroke="#333" stroke-width="1.5"/>
+    <circle cx="256" cy="290" r="6" fill="#555" stroke="#333" stroke-width="1.5"/>
+    <circle cx="342" cy="290" r="6" fill="#555" stroke="#333" stroke-width="1.5"/>
+    <!-- Grip wrap texture lines -->
+    <line x1="195" y1="272" x2="195" y2="308" stroke="#505050" stroke-width="1" opacity="0.4"/>
+    <line x1="215" y1="272" x2="215" y2="308" stroke="#505050" stroke-width="1" opacity="0.4"/>
+    <line x1="295" y1="272" x2="295" y2="308" stroke="#505050" stroke-width="1" opacity="0.4"/>
+    <line x1="315" y1="272" x2="315" y2="308" stroke="#505050" stroke-width="1" opacity="0.4"/>
+
+    <!-- Claw 1 (leftmost) -->
+    <path d="M175,272 C172,220 158,160 130,90 C128,84 132,78 138,80 C168,92 182,150 190,200 C194,224 196,252 196,272 Z"
+          fill="url(#rust)" filter="url(#aged)"/>
+    <path d="M175,272 C172,220 158,160 130,90 C132,88 136,82 138,80"
+          fill="none" stroke="url(#edge)" stroke-width="2" opacity="0.7"/>
+
+    <!-- Claw 2 (left-center) -->
+    <path d="M220,272 C219,210 218,145 215,68 C214,60 222,56 226,62 C238,90 240,155 240,215 C240,242 239,262 238,272 Z"
+          fill="url(#rust)" filter="url(#aged)"/>
+    <path d="M220,272 C219,210 218,145 215,68 C216,62 222,58 226,62"
+          fill="none" stroke="url(#edge)" stroke-width="2" opacity="0.7"/>
+
+    <!-- Claw 3 (center) — tallest -->
+    <path d="M265,272 C264,200 264,130 268,52 C269,44 277,42 278,50 C284,95 284,165 283,230 C282,250 281,265 280,272 Z"
+          fill="url(#rust)" filter="url(#aged)"/>
+    <path d="M265,272 C264,200 264,130 268,52 C270,44 276,42 278,50"
+          fill="none" stroke="url(#edge)" stroke-width="2" opacity="0.7"/>
+
+    <!-- Claw 4 (right-center) -->
+    <path d="M310,272 C312,215 320,150 340,82 C342,76 350,76 348,84 C338,145 330,210 325,260 C323,268 322,272 320,272 Z"
+          fill="url(#rust)" filter="url(#aged)"/>
+    <path d="M310,272 C312,215 320,150 340,82 C342,78 348,76 348,84"
+          fill="none" stroke="url(#edge)" stroke-width="2" opacity="0.7"/>
+
+    <!-- Finger ring loops under crossbar -->
+    <ellipse cx="185" cy="330" rx="22" ry="28" fill="none" stroke="url(#bronze)" stroke-width="7" filter="url(#aged)"/>
+    <ellipse cx="256" cy="330" rx="22" ry="28" fill="none" stroke="url(#bronze)" stroke-width="7" filter="url(#aged)"/>
+    <ellipse cx="327" cy="330" rx="22" ry="28" fill="none" stroke="url(#bronze)" stroke-width="7" filter="url(#aged)"/>
+  </g>
+
+  <!-- Subtle battle scratch marks on the circle border -->
+  <line x1="60" y1="140" x2="80" y2="170" stroke="#5A4030" stroke-width="2" opacity="0.3" stroke-linecap="round"/>
+  <line x1="65" y1="135" x2="85" y2="165" stroke="#5A4030" stroke-width="1.5" opacity="0.25" stroke-linecap="round"/>
+  <line x1="420" y1="380" x2="445" y2="405" stroke="#5A4030" stroke-width="2" opacity="0.3" stroke-linecap="round"/>
+  <line x1="425" y1="375" x2="450" y2="400" stroke="#5A4030" stroke-width="1.5" opacity="0.25" stroke-linecap="round"/>
+</svg>
