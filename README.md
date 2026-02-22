@@ -8,12 +8,12 @@
 <h1 align="center">RustedClaw</h1>
 
 <p align="center">
-  <strong>A lightweight Rust reimplementation of OpenClaw — self-hosted AI assistant that idles at <10 MB RAM.</strong>
+  <strong>A lightweight Rust reimplementation of OpenClaw — self-hosted AI assistant that idles at <7 MB RAM.</strong>
 </p>
 
 <p align="center">
   <a href="#-quick-start"><img src="https://img.shields.io/badge/get_started-2_min-brightgreen?style=for-the-badge" alt="Get Started"></a>
-  <a href="#-rustedclaw-vs-openclaw"><img src="https://img.shields.io/badge/RAM-12.5_MB_vs_1.2_GB-critical?style=for-the-badge" alt="RAM"></a>
+  <a href="#-rustedclaw-vs-openclaw-vs-zeroclaw"><img src="https://img.shields.io/badge/RAM-6.5_MB_idle-critical?style=for-the-badge" alt="RAM"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
 </p>
 
@@ -28,20 +28,34 @@
 
 ---
 
-## 🦞 RustedClaw vs OpenClaw
+## 🦞 RustedClaw vs OpenClaw vs ZeroClaw
 
 The whole point of this project: **same features, 100× less resources.**
 
-| | **RustedClaw** 🦞 | **OpenClaw** 🐙 | **Δ** |
+| | **RustedClaw** 🦞 | **ZeroClaw** 🦀 | **OpenClaw** 🐙 |
 |---|:---:|:---:|:---:|
-| **Idle RAM** | **12.5 MB** | ~1.2 GB | **96× less** |
-| **Private Memory** | **3.2 MB** | ~600 MB | **187× less** |
-| **After 200-req burst** | **12.6 MB** *(no growth)* | ~1.8 GB *(GC pressure)* | **143× less** |
-| **Cold Start** | **7 ms** | ~4 s | **571× faster** |
-| **Binary / Install Size** | **4.4 MB** | ~300 MB (node_modules) | **68× smaller** |
-| **Runtime Dependencies** | **0** — single static binary | Node 18 + Python 3 + npm | **Zero** |
-| **CPU at Idle (2 min)** | 0.047 s | ~2 s | **42× less** |
-| **Deployment** | `scp` one file | Install runtime → clone → `npm i` → pray | - |
+| **Idle RAM** | **6.5 MB** | ~8–12 MB¹ | ~1.2 GB |
+| **Private Memory** | **1.3 MB** | ~4 MB¹ | ~600 MB |
+| **After 200-req burst** | **6.9 MB** *(zero growth)* | not published | ~1.8 GB |
+| **Cold Start** | **17 ms** | ~20 ms¹ | ~4 s |
+| **Binary Size** | **3.8 MB** | 8.8 MB | ~300 MB (node_modules) |
+| **Threads (idle)** | **6** | not published | 30+ (Node event loop + workers) |
+| **Runtime Deps** | **0** — single static binary | 0 — single binary | Node 18 + Python 3 + npm |
+| **TLS** | `rustls` (pure Rust) | `rustls` | OpenSSL via Node.js |
+| **Deployment** | Copy 1 file (3.8 MB) | Copy 1 file (8.8 MB) | npm install → pray |
+
+<sub>¹ ZeroClaw self-reported numbers for `--help`/`status` commands (exit immediately). Gateway idle RAM is not published. Binary size from macOS arm64 release build. Source: [zeroclaw-labs/zeroclaw](https://github.com/zeroclaw-labs/zeroclaw) README, Feb 2026.</sub>
+
+### Why RustedClaw is smaller than ZeroClaw
+
+Both projects are Rust. The difference comes from **engineering choices**:
+
+- **`opt-level = "z"`** — we optimize for size, not speed. For an I/O-bound LLM proxy, size wins.
+- **2 Tokio worker threads** — not CPU-count default. An AI assistant doesn't need 20 threads idle.
+- **`rustls` everywhere** — pure-Rust TLS, no native OpenSSL linkage overhead.
+- **`panic = "abort"`** — no unwinding tables in the binary.
+- **Feature-gated heavy deps** — `wasmtime` (WASM sandbox) is opt-in, not compiled by default.
+- **12 focused crates** — each crate pulls only what it needs. No kitchen-sink binary.
 
 > **Reproduce these numbers yourself:** run `scripts/benchmark.ps1` (Windows) or `scripts/benchmark.sh` (Linux/macOS).
 

@@ -2,11 +2,14 @@
 
 use rustedclaw_config::AppConfig;
 
-pub async fn run(port_override: Option<u16>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(port_override: Option<u16>, host_override: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::load().map_err(|e| format!("Failed to load config: {e}"))?;
 
     if let Some(port) = port_override {
         config.gateway.port = port;
+    }
+    if let Some(host) = host_override {
+        config.gateway.host = host;
     }
 
     println!("🦀 RustedClaw Gateway");

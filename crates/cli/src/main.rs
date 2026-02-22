@@ -45,6 +45,10 @@ enum Commands {
         /// Override the port
         #[arg(short, long)]
         port: Option<u16>,
+
+        /// Override the host (e.g. 0.0.0.0 for Docker)
+        #[arg(long)]
+        host: Option<String>,
     },
 
     /// Start the full daemon (gateway + channels + cron)
@@ -57,7 +61,7 @@ enum Commands {
     Doctor,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
@@ -74,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Commands::Onboard => commands::onboard::run().await?,
         Commands::Agent { message } => commands::agent::run(message).await?,
-        Commands::Gateway { port } => commands::gateway::run(port).await?,
+        Commands::Gateway { port, host } => commands::gateway::run(port, host).await?,
         Commands::Daemon => commands::daemon::run().await?,
         Commands::Status => commands::status::run().await?,
         Commands::Doctor => commands::doctor::run().await?,

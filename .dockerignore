@@ -1,0 +1,8 @@
+target/
+.git/
+.gitignore
+.env
+*.md
+scripts/
+benchmark-results.txt
+*.log
