@@ -62,9 +62,26 @@ pub fn build_full_router(legacy_state: SharedState, api_state: api_v1::SharedApi
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
-/// Create the AgentLoop from config (shared helper).
-fn build_agent(config: &rustedclaw_config::AppConfig) -> Arc<AgentLoop> {
-    let router = rustedclaw_providers::router::build_from_config(config);
+/// Start the gateway HTTP server.
+///
+/// Memory-optimized: builds provider, tools, identity, and event bus
+/// only ONCE and shares them via Arc between legacy and v1 state.
+pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let host = config.gateway.host.clone();
+    let port = config.gateway.port;
+    let addr = format!("{host}:{port}");
+
+    // Generate pairing code if required
+    let pairing_code = if config.gateway.require_pairing {
+        let code = format!("{:06}", rand_simple());
+        info!(code = %code, "Pairing code generated — use POST /pair with X-Pairing-Code header");
+        Some(code)
+    } else {
+        None
+    };
+
+    // === Build shared subsystems ONCE (no duplication) ===
+    let router = rustedclaw_providers::router::build_from_config(&config);
     let provider = router
         .default()
         .expect("No default provider configured — set an API key");
@@ -84,32 +101,15 @@ fn build_agent(config: &rustedclaw_config::AppConfig) -> Arc<AgentLoop> {
     let tools = Arc::new(rustedclaw_tools::default_registry());
     let event_bus = Arc::new(EventBus::default());
 
-    Arc::new(AgentLoop::new(
-        provider,
+    // Shared agent for legacy routes (reuses same provider/tools/identity)
+    let agent = Arc::new(AgentLoop::new(
+        provider.clone(),
         &config.default_model,
         config.default_temperature,
-        tools,
-        identity,
-        event_bus,
-    ).with_max_tokens(config.default_max_tokens))
-}
-
-/// Start the gateway HTTP server.
-pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let host = config.gateway.host.clone();
-    let port = config.gateway.port;
-    let addr = format!("{host}:{port}");
-
-    // Generate pairing code if required
-    let pairing_code = if config.gateway.require_pairing {
-        let code = format!("{:06}", rand_simple());
-        info!(code = %code, "Pairing code generated — use POST /pair with X-Pairing-Code header");
-        Some(code)
-    } else {
-        None
-    };
-
-    let agent = build_agent(&config);
+        tools.clone(),
+        identity.clone(),
+        event_bus.clone(),
+    ).with_max_tokens(config.default_max_tokens));
 
     // Build shared state for legacy routes.
     let legacy_state = Arc::new(RwLock::new(GatewayState {
@@ -119,26 +119,7 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
         agent,
     }));
 
-    // Build v1 API state.
-    let router = rustedclaw_providers::router::build_from_config(&config);
-    let provider = router
-        .default()
-        .expect("No default provider configured");
-    let context_paths = ContextPaths {
-        global_dir: Some(rustedclaw_config::AppConfig::workspace_dir()),
-        project_dir: None,
-        extra_files: config
-            .identity
-            .extra_context_files
-            .iter()
-            .map(std::path::PathBuf::from)
-            .collect(),
-        system_prompt_override: config.identity.system_prompt_override.clone(),
-    };
-    let identity = Identity::load(&context_paths);
-    let tools = Arc::new(rustedclaw_tools::default_registry());
-    let event_bus = Arc::new(EventBus::default());
-
+    // Build v1 API state (reuses same provider/tools/identity/event_bus).
     let api_state = Arc::new(api_v1::ApiV1State {
         provider,
         model: config.default_model.clone(),
@@ -289,7 +270,27 @@ mod tests {
 
     fn test_state() -> SharedState {
         let config = rustedclaw_config::AppConfig::default();
-        let agent = build_agent(&config);
+        let router = rustedclaw_providers::router::build_from_config(&config);
+        let provider = router
+            .default()
+            .expect("No default provider configured");
+        let context_paths = ContextPaths {
+            global_dir: Some(rustedclaw_config::AppConfig::workspace_dir()),
+            project_dir: None,
+            extra_files: vec![],
+            system_prompt_override: None,
+        };
+        let identity = Identity::load(&context_paths);
+        let tools = Arc::new(rustedclaw_tools::default_registry());
+        let event_bus = Arc::new(EventBus::default());
+        let agent = Arc::new(AgentLoop::new(
+            provider,
+            &config.default_model,
+            config.default_temperature,
+            tools,
+            identity,
+            event_bus,
+        ).with_max_tokens(config.default_max_tokens));
         Arc::new(RwLock::new(GatewayState {
             config,
             pairing_code: None,
