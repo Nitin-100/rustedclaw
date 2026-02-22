@@ -1,0 +1,381 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:        # manual trigger anytime
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  bench:
+    name: Bench (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - name: macOS Apple Silicon
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: Windows x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-bench-
+
+      - name: Build release binary
+        run: cargo build --release
+
+      # ── Binary Size ──────────────────────────────────────────
+      - name: Measure binary size
+        shell: bash
+        run: |
+          if [ -f target/release/rustedclaw ]; then
+            BIN=target/release/rustedclaw
+          else
+            BIN=target/release/rustedclaw.exe
+          fi
+          SIZE=$(stat --format=%s "$BIN" 2>/dev/null || stat -f%z "$BIN" 2>/dev/null)
+          SIZE_MB=$(echo "scale=2; $SIZE / 1048576" | bc)
+          echo "BINARY_SIZE=${SIZE}" >> $GITHUB_ENV
+          echo "BINARY_MB=${SIZE_MB}" >> $GITHUB_ENV
+          echo "binary_size=${SIZE_MB} MB (${SIZE} bytes)" >> $GITHUB_STEP_SUMMARY
+
+      # ── Cold Start ───────────────────────────────────────────
+      - name: Measure cold start (20 runs)
+        shell: bash
+        run: |
+          if [ -f target/release/rustedclaw ]; then
+            BIN=./target/release/rustedclaw
+          else
+            BIN=./target/release/rustedclaw.exe
+          fi
+          TIMES=""
+          SUM=0
+          for i in $(seq 1 20); do
+            START=$(date +%s%N 2>/dev/null || python3 -c "import time; print(int(time.time()*1e9))")
+            $BIN version > /dev/null 2>&1 || true
+            END=$(date +%s%N 2>/dev/null || python3 -c "import time; print(int(time.time()*1e9))")
+            ELAPSED=$(( (END - START) / 1000000 ))
+            SUM=$((SUM + ELAPSED))
+            TIMES="${TIMES} ${ELAPSED}"
+          done
+          AVG=$((SUM / 20))
+          MIN=$(echo $TIMES | tr ' ' '\n' | sort -n | head -1)
+          MAX=$(echo $TIMES | tr ' ' '\n' | sort -n | tail -1)
+          echo "COLD_START_AVG=${AVG}" >> $GITHUB_ENV
+          echo "COLD_START_MIN=${MIN}" >> $GITHUB_ENV
+          echo "COLD_START_MAX=${MAX}" >> $GITHUB_ENV
+          echo "cold_start=avg ${AVG}ms, min ${MIN}ms, max ${MAX}ms" >> $GITHUB_STEP_SUMMARY
+
+      # ── Gateway Benchmark (Linux only — needs /proc for RSS) ──
+      - name: Gateway benchmark
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          export OPENAI_API_KEY="sk-ci-placeholder"
+          ./target/release/rustedclaw gateway --port 42617 &
+          GW_PID=$!
+          sleep 2
+
+          # Idle RAM (RSS from /proc)
+          IDLE_RSS=$(cat /proc/$GW_PID/status | grep VmRSS | awk '{print $2}')
+          echo "IDLE_RSS_KB=${IDLE_RSS}" >> $GITHUB_ENV
+
+          # Idle threads
+          THREADS=$(ls /proc/$GW_PID/task | wc -l)
+          echo "THREADS=${THREADS}" >> $GITHUB_ENV
+
+          # Health check
+          curl -sf http://127.0.0.1:42617/health | jq .
+
+          # Sequential throughput (1000 requests)
+          START=$(date +%s%N)
+          OK=0
+          for i in $(seq 1 1000); do
+            if curl -sf http://127.0.0.1:42617/health > /dev/null 2>&1; then
+              OK=$((OK + 1))
+            fi
+          done
+          END=$(date +%s%N)
+          ELAPSED_MS=$(( (END - START) / 1000000 ))
+          ELAPSED_S=$(echo "scale=2; $ELAPSED_MS / 1000" | bc)
+          RPS=$(echo "scale=0; $OK * 1000 / $ELAPSED_MS" | bc)
+          echo "SEQ_RPS=${RPS}" >> $GITHUB_ENV
+          echo "SEQ_OK=${OK}" >> $GITHUB_ENV
+
+          # Post-load RAM
+          LOAD_RSS=$(cat /proc/$GW_PID/status | grep VmRSS | awk '{print $2}')
+          echo "LOAD_RSS_KB=${LOAD_RSS}" >> $GITHUB_ENV
+
+          # Concurrent burst (10 parallel x 100 each)
+          BURST_OK=0
+          for j in $(seq 1 10); do
+            (
+              for i in $(seq 1 100); do
+                curl -sf http://127.0.0.1:42617/health > /dev/null 2>&1
+              done
+            ) &
+          done
+          wait
+
+          # Post-burst RAM
+          BURST_RSS=$(cat /proc/$GW_PID/status | grep VmRSS | awk '{print $2}')
+          echo "BURST_RSS_KB=${BURST_RSS}" >> $GITHUB_ENV
+
+          # Chat POST test (alloc-heavy)
+          for i in $(seq 1 20); do
+            curl -sf -X POST http://127.0.0.1:42617/v1/chat/completions \
+              -H "Content-Type: application/json" \
+              -d '{"messages":[{"role":"user","content":"benchmark test"}]}' \
+              > /dev/null 2>&1 || true
+          done
+
+          CHAT_RSS=$(cat /proc/$GW_PID/status | grep VmRSS | awk '{print $2}')
+          echo "CHAT_RSS_KB=${CHAT_RSS}" >> $GITHUB_ENV
+
+          kill $GW_PID 2>/dev/null || true
+          wait $GW_PID 2>/dev/null || true
+
+      # ── macOS Gateway Benchmark ──────────────────────────────
+      - name: Gateway benchmark
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          export OPENAI_API_KEY="sk-ci-placeholder"
+          ./target/release/rustedclaw gateway --port 42617 &
+          GW_PID=$!
+          sleep 2
+
+          # Idle RSS via ps
+          IDLE_RSS=$(ps -o rss= -p $GW_PID | tr -d ' ')
+          echo "IDLE_RSS_KB=${IDLE_RSS}" >> $GITHUB_ENV
+
+          THREADS=$(ps -M -p $GW_PID | tail -n +2 | wc -l | tr -d ' ')
+          echo "THREADS=${THREADS}" >> $GITHUB_ENV
+
+          curl -sf http://127.0.0.1:42617/health
+
+          # Sequential throughput
+          START=$(python3 -c "import time; print(int(time.time()*1e9))")
+          OK=0
+          for i in $(seq 1 1000); do
+            if curl -sf http://127.0.0.1:42617/health > /dev/null 2>&1; then
+              OK=$((OK + 1))
+            fi
+          done
+          END=$(python3 -c "import time; print(int(time.time()*1e9))")
+          ELAPSED_MS=$(( (END - START) / 1000000 ))
+          RPS=$(echo "scale=0; $OK * 1000 / $ELAPSED_MS" | bc)
+          echo "SEQ_RPS=${RPS}" >> $GITHUB_ENV
+          echo "SEQ_OK=${OK}" >> $GITHUB_ENV
+
+          LOAD_RSS=$(ps -o rss= -p $GW_PID | tr -d ' ')
+          echo "LOAD_RSS_KB=${LOAD_RSS}" >> $GITHUB_ENV
+
+          # Concurrent burst
+          for j in $(seq 1 10); do
+            (
+              for i in $(seq 1 100); do
+                curl -sf http://127.0.0.1:42617/health > /dev/null 2>&1
+              done
+            ) &
+          done
+          wait
+
+          BURST_RSS=$(ps -o rss= -p $GW_PID | tr -d ' ')
+          echo "BURST_RSS_KB=${BURST_RSS}" >> $GITHUB_ENV
+
+          for i in $(seq 1 20); do
+            curl -sf -X POST http://127.0.0.1:42617/v1/chat/completions \
+              -H "Content-Type: application/json" \
+              -d '{"messages":[{"role":"user","content":"benchmark test"}]}' \
+              > /dev/null 2>&1 || true
+          done
+
+          CHAT_RSS=$(ps -o rss= -p $GW_PID | tr -d ' ')
+          echo "CHAT_RSS_KB=${CHAT_RSS}" >> $GITHUB_ENV
+
+          kill $GW_PID 2>/dev/null || true
+
+      # ── Windows Gateway Benchmark ────────────────────────────
+      - name: Gateway benchmark
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:OPENAI_API_KEY = 'sk-ci-placeholder'
+          $proc = Start-Process -FilePath '.\target\release\rustedclaw.exe' -ArgumentList 'gateway','--port','42617' -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 3
+
+          # Idle RAM
+          $proc.Refresh()
+          $idleKB = [math]::Round($proc.WorkingSet64 / 1024)
+          echo "IDLE_RSS_KB=$idleKB" >> $env:GITHUB_ENV
+          $threads = $proc.Threads.Count
+          echo "THREADS=$threads" >> $env:GITHUB_ENV
+
+          Invoke-WebRequest -Uri 'http://127.0.0.1:42617/health' -UseBasicParsing | Select-Object -ExpandProperty Content
+
+          # Sequential throughput
+          $sw = [System.Diagnostics.Stopwatch]::StartNew()
+          $ok = 0
+          for ($i = 0; $i -lt 1000; $i++) {
+            try { $null = Invoke-WebRequest 'http://127.0.0.1:42617/health' -UseBasicParsing -TimeoutSec 10; $ok++ } catch {}
+          }
+          $sw.Stop()
+          $rps = [math]::Round($ok / $sw.Elapsed.TotalSeconds)
+          echo "SEQ_RPS=$rps" >> $env:GITHUB_ENV
+          echo "SEQ_OK=$ok" >> $env:GITHUB_ENV
+
+          $proc.Refresh()
+          $loadKB = [math]::Round($proc.WorkingSet64 / 1024)
+          echo "LOAD_RSS_KB=$loadKB" >> $env:GITHUB_ENV
+
+          # Concurrent burst (10x100)
+          $jobs = @()
+          foreach ($j in 1..10) {
+            $jobs += Start-Job { param($n) $c=0; foreach($i in 1..$n){try{$null=Invoke-WebRequest 'http://127.0.0.1:42617/health' -UseBasicParsing -TimeoutSec 10;$c++}catch{}}; $c } -Arg 100
+          }
+          $null = $jobs | Wait-Job | Receive-Job
+          $jobs | Remove-Job -Force
+
+          $proc.Refresh()
+          $burstKB = [math]::Round($proc.WorkingSet64 / 1024)
+          echo "BURST_RSS_KB=$burstKB" >> $env:GITHUB_ENV
+
+          # Chat POST
+          $body = '{"messages":[{"role":"user","content":"benchmark test"}]}'
+          foreach ($i in 1..20) {
+            try { $null = Invoke-WebRequest 'http://127.0.0.1:42617/v1/chat/completions' -Method POST -Body $body -ContentType 'application/json' -UseBasicParsing -TimeoutSec 5 } catch {}
+          }
+
+          $proc.Refresh()
+          $chatKB = [math]::Round($proc.WorkingSet64 / 1024)
+          echo "CHAT_RSS_KB=$chatKB" >> $env:GITHUB_ENV
+
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+
+      # ── Publish Results ──────────────────────────────────────
+      - name: Write benchmark summary
+        shell: bash
+        run: |
+          echo "## 🧪 Benchmark: ${{ matrix.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Binary** | ${BINARY_MB} MB |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Cold start** | avg ${COLD_START_AVG}ms (min ${COLD_START_MIN}, max ${COLD_START_MAX}) |" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${IDLE_RSS_KB}" ]; then
+            IDLE_MB=$(echo "scale=2; ${IDLE_RSS_KB} / 1024" | bc)
+            LOAD_MB=$(echo "scale=2; ${LOAD_RSS_KB} / 1024" | bc)
+            BURST_MB=$(echo "scale=2; ${BURST_RSS_KB} / 1024" | bc)
+            CHAT_MB=$(echo "scale=2; ${CHAT_RSS_KB} / 1024" | bc)
+            echo "| **Idle RAM** | ${IDLE_RSS_KB} KiB (${IDLE_MB} MiB) |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Threads** | ${THREADS} |" >> $GITHUB_STEP_SUMMARY
+            echo "| **After 1K seq req** | ${LOAD_MB} MiB |" >> $GITHUB_STEP_SUMMARY
+            echo "| **After 1K concurrent** | ${BURST_MB} MiB |" >> $GITHUB_STEP_SUMMARY
+            echo "| **After 20 chat POSTs** | ${CHAT_MB} MiB |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Throughput** | ${SEQ_RPS} req/s (${SEQ_OK}/1000 OK) |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Runner: ${{ matrix.os }} (${{ runner.arch }})_" >> $GITHUB_STEP_SUMMARY
+
+      - name: Save results as artifact
+        shell: bash
+        run: |
+          mkdir -p bench-results
+          cat > bench-results/${{ matrix.name }}.json << EOF
+          {
+            "platform": "${{ matrix.name }}",
+            "runner": "${{ matrix.os }}",
+            "arch": "${{ runner.arch }}",
+            "binary_bytes": ${BINARY_SIZE:-0},
+            "binary_mb": "${BINARY_MB:-?}",
+            "cold_start_avg_ms": ${COLD_START_AVG:-0},
+            "cold_start_min_ms": ${COLD_START_MIN:-0},
+            "cold_start_max_ms": ${COLD_START_MAX:-0},
+            "idle_rss_kb": ${IDLE_RSS_KB:-0},
+            "threads": ${THREADS:-0},
+            "load_rss_kb": ${LOAD_RSS_KB:-0},
+            "burst_rss_kb": ${BURST_RSS_KB:-0},
+            "chat_rss_kb": ${CHAT_RSS_KB:-0},
+            "seq_rps": ${SEQ_RPS:-0},
+            "seq_ok": ${SEQ_OK:-0}
+          }
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ matrix.name }}
+          path: bench-results/
+
+  # ── Aggregate & publish combined table ─────────────────────
+  summary:
+    name: Publish Results
+    needs: bench
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bench-*
+          merge-multiple: true
+          path: results
+
+      - name: Generate combined table
+        shell: bash
+        run: |
+          echo "## 🧪 RustedClaw Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Automated CI run — $(date -u '+%Y-%m-%d %H:%M UTC')_" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Linux x86_64 | macOS ARM64 | Windows x86_64 |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|:---:|:---:|:---:|" >> $GITHUB_STEP_SUMMARY
+
+          # Read each JSON
+          LIN=$(cat results/Linux\ x86_64.json 2>/dev/null || echo '{}')
+          MAC=$(cat results/macOS\ Apple\ Silicon.json 2>/dev/null || echo '{}')
+          WIN=$(cat results/Windows\ x86_64.json 2>/dev/null || echo '{}')
+
+          get() { echo "$1" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('$2','—'))" 2>/dev/null || echo "—"; }
+
+          echo "| **Binary** | $(get "$LIN" binary_mb) MB | $(get "$MAC" binary_mb) MB | $(get "$WIN" binary_mb) MB |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Cold start** | $(get "$LIN" cold_start_avg_ms)ms | $(get "$MAC" cold_start_avg_ms)ms | $(get "$WIN" cold_start_avg_ms)ms |" >> $GITHUB_STEP_SUMMARY
+
+          lin_idle=$(echo "scale=2; $(get "$LIN" idle_rss_kb) / 1024" | bc 2>/dev/null || echo "—")
+          mac_idle=$(echo "scale=2; $(get "$MAC" idle_rss_kb) / 1024" | bc 2>/dev/null || echo "—")
+          win_idle=$(echo "scale=2; $(get "$WIN" idle_rss_kb) / 1024" | bc 2>/dev/null || echo "—")
+          echo "| **Idle RAM** | ${lin_idle} MiB | ${mac_idle} MiB | ${win_idle} MiB |" >> $GITHUB_STEP_SUMMARY
+
+          echo "| **Threads** | $(get "$LIN" threads) | $(get "$MAC" threads) | $(get "$WIN" threads) |" >> $GITHUB_STEP_SUMMARY
+
+          lin_burst=$(echo "scale=2; $(get "$LIN" burst_rss_kb) / 1024" | bc 2>/dev/null || echo "—")
+          mac_burst=$(echo "scale=2; $(get "$MAC" burst_rss_kb) / 1024" | bc 2>/dev/null || echo "—")
+          win_burst=$(echo "scale=2; $(get "$WIN" burst_rss_kb) / 1024" | bc 2>/dev/null || echo "—")
+          echo "| **Peak RAM (1K burst)** | ${lin_burst} MiB | ${mac_burst} MiB | ${win_burst} MiB |" >> $GITHUB_STEP_SUMMARY
+
+          echo "| **Throughput** | $(get "$LIN" seq_rps) req/s | $(get "$MAC" seq_rps) req/s | $(get "$WIN" seq_rps) req/s |" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> All numbers from GitHub Actions runners (2-4 CPU, 7-16 GB RAM). Not optimized for throughput — these are baseline numbers on shared CI hardware." >> $GITHUB_STEP_SUMMARY
