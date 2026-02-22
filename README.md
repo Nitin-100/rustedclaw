@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-    <img src="assets/logo.svg" width="120" alt="RustedClaw">
-  </picture>
+  <img src="assets/logo.png" width="180" alt="RustedClaw">
 </p>
 
 <h1 align="center">RustedClaw</h1>
@@ -24,7 +21,7 @@
 
 There are several open-source AI agent runtimes. Here's how they compare:
 
-| | **RustedClaw** 🦞 | **nullclaw** ⚡ | **ZeroClaw** 🦀 | **IronClaw** 🔗 | **OpenClaw** 🐙 |
+| | **RustedClaw** <img src="assets/logo.png" width="18"> | **nullclaw** ⚡ | **ZeroClaw** 🦀 | **IronClaw** 🔗 | **OpenClaw** 🐙 |
 |---|:---:|:---:|:---:|:---:|:---:|
 | **Language** | Rust | Zig | Rust | Rust | Rust + JS |
 | **Account Required** | **No** ✅ | **No** ✅ | **No** ✅ | **Yes** ❌ (NEAR AI) | **No** ✅ |
