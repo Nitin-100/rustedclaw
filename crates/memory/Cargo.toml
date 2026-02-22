@@ -1,0 +1,26 @@
+[package]
+name = "rustedclaw-memory"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Memory system with hybrid search for RustedClaw"
+
+[features]
+default = ["sqlite"]
+sqlite = ["sqlx"]
+postgres = ["sqlx"]
+
+[dependencies]
+rustedclaw-core = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+sqlx = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+tempfile = "3"

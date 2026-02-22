@@ -1,0 +1,33 @@
+# Build artifacts
+/target/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# RustedClaw runtime data
+.rustedclaw/
+*.db
+*.db-shm
+*.db-wal
+
+# Benchmark output
+benchmark-results.txt
+
+# Logs
+*.log
+
+# Environment — NEVER commit real keys
+.env
+!.env.example
+
+# Draft docs
+OpenClaw Draft*.txt

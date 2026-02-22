@@ -1,0 +1,17 @@
+[package]
+name = "rustedclaw-config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Configuration loading and validation for RustedClaw"
+
+[dependencies]
+rustedclaw-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

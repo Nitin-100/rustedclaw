@@ -1,0 +1,31 @@
+[package]
+name = "rustedclaw-gateway"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HTTP API gateway for RustedClaw"
+
+[dependencies]
+rustedclaw-core = { workspace = true }
+rustedclaw-config = { workspace = true }
+rustedclaw-agent = { workspace = true }
+rustedclaw-providers = { workspace = true }
+rustedclaw-tools = { workspace = true }
+rustedclaw-memory = { workspace = true }
+rustedclaw-workflow = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+http-body-util = "0.1"

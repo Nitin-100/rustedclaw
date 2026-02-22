@@ -1,0 +1,20 @@
+[package]
+name = "rustedclaw-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core domain types and traits for the RustedClaw AI agent runtime"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+tempfile = "3"

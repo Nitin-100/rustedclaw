@@ -1,0 +1,18 @@
+[package]
+name = "rustedclaw-workflow"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Workflow engine: cron scheduler, heartbeat, and event triggers"
+
+[dependencies]
+rustedclaw-core = { workspace = true }
+rustedclaw-config = { path = "../config" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }

@@ -1,0 +1,26 @@
+# RustedClaw — docker compose up -d
+#
+# 1. Copy .env.example to .env and fill in your API key
+# 2. docker compose up -d
+# 3. Open http://localhost:42617
+#
+services:
+  rustedclaw:
+    build: .
+    container_name: rustedclaw
+    restart: unless-stopped
+    ports:
+      - "42617:42617"
+    environment:
+      - RUSTEDCLAW_API_KEY=${RUSTEDCLAW_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - RUSTEDCLAW_PROVIDER=${RUSTEDCLAW_PROVIDER:-openai}
+      - RUSTEDCLAW_MODEL=${RUSTEDCLAW_MODEL:-gpt-4o-mini}
+    volumes:
+      - rustedclaw-data:/home/rustedclaw/.rustedclaw
+    mem_limit: 64m       # yes, 64 MB is generous — it idles at 12.5 MB
+    cpus: 0.5
+
+volumes:
+  rustedclaw-data:

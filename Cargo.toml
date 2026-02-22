@@ -1,0 +1,94 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/config",
+    "crates/providers",
+    "crates/channels",
+    "crates/memory",
+    "crates/tools",
+    "crates/agent",
+    "crates/gateway",
+    "crates/workflow",
+    "crates/security",
+    "crates/cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Nitin-100/rustedclaw"
+rust-version = "1.85"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# HTTP / Web
+axum = { version = "0.8", features = ["ws", "macros"] }
+reqwest = { version = "0.12", features = ["json", "stream", "native-tls"], default-features = false }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging / Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Async traits & utilities
+async-trait = "0.1"
+futures = "0.3"
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "sqlite", "postgres", "migrate", "chrono"] }
+
+# Crypto & Security
+base64 = "0.22"
+sha2 = "0.10"
+hmac = "0.12"
+
+# UUID
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# WASM runtime (for plugin sandboxing)
+wasmtime = "28"
+
+# Internal crates
+rustedclaw-core = { path = "crates/core" }
+rustedclaw-config = { path = "crates/config" }
+rustedclaw-providers = { path = "crates/providers" }
+rustedclaw-channels = { path = "crates/channels" }
+rustedclaw-memory = { path = "crates/memory" }
+rustedclaw-tools = { path = "crates/tools" }
+rustedclaw-agent = { path = "crates/agent" }
+rustedclaw-gateway = { path = "crates/gateway" }
+rustedclaw-workflow = { path = "crates/workflow" }
+rustedclaw-security = { path = "crates/security" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.release-fast]
+inherits = "release"
+codegen-units = 8
+lto = "thin"

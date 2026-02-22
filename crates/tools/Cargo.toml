@@ -1,0 +1,27 @@
+[package]
+name = "rustedclaw-tools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Built-in tool implementations for RustedClaw"
+
+[features]
+default = []
+wasm = ["wasmtime"]
+
+[dependencies]
+rustedclaw-core = { workspace = true }
+rustedclaw-memory = { path = "../memory", default-features = false }
+rustedclaw-security = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true, features = ["process"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+wasmtime = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+tempfile = "3"
+wat = "1"

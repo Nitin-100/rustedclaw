@@ -1,0 +1,20 @@
+[package]
+name = "rustedclaw-security"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Security policies, encryption, allowlists, and audit logging for RustedClaw"
+
+[dependencies]
+rustedclaw-core = { workspace = true }
+rustedclaw-config = { path = "../config" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+rand = "0.9"
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }

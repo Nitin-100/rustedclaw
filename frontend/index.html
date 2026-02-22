@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RustedClaw — AI Agent Runtime</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar Navigation -->
+        <nav id="sidebar">
+            <div class="sidebar-header">
+                <h1>🦀 RustedClaw</h1>
+                <span class="version" id="version-badge">v0.1.0</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#" class="nav-link active" data-page="chat">💬 Chat</a></li>
+                <li><a href="#" class="nav-link" data-page="memory">🧠 Memory</a></li>
+                <li><a href="#" class="nav-link" data-page="tools">🔧 Tools</a></li>
+                <li><a href="#" class="nav-link" data-page="routines">⏰ Routines</a></li>
+                <li><a href="#" class="nav-link" data-page="jobs">📋 Jobs</a></li>
+                <li><a href="#" class="nav-link" data-page="logs">📜 Logs</a></li>
+                <li><a href="#" class="nav-link" data-page="settings">⚙️ Settings</a></li>
+            </ul>
+            <div class="sidebar-footer">
+                <div id="status-indicator" class="status offline">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connecting...</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main id="content">
+            <!-- Chat Page -->
+            <section id="page-chat" class="page active">
+                <div class="page-header">
+                    <h2>Chat</h2>
+                    <div class="header-actions">
+                        <select id="conversation-select">
+                            <option value="">New Conversation</option>
+                        </select>
+                        <button class="btn btn-sm" id="new-chat-btn">+ New</button>
+                    </div>
+                </div>
+                <div id="chat-messages" class="chat-container">
+                    <div class="empty-state">
+                        <p>Start a conversation with the agent</p>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <textarea id="chat-input" placeholder="Type a message... (Enter to send, Shift+Enter for newline)" rows="2"></textarea>
+                    <button id="send-btn" class="btn btn-primary">Send</button>
+                </div>
+            </section>
+
+            <!-- Memory Page -->
+            <section id="page-memory" class="page">
+                <div class="page-header">
+                    <h2>Memory</h2>
+                    <div class="header-actions">
+                        <input type="text" id="memory-search" placeholder="Search memories..." class="search-input">
+                        <button class="btn btn-sm" id="memory-search-btn">Search</button>
+                    </div>
+                </div>
+                <div id="memory-save-form" class="form-inline" style="display:none; margin-bottom:1rem; padding:1rem; background:var(--bg-secondary); border-radius:8px;">
+                    <textarea id="memory-content" placeholder="Memory content..." rows="2" style="width:100%;margin-bottom:0.5rem;padding:0.5rem;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;resize:vertical;"></textarea>
+                    <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <input type="text" id="memory-tags" placeholder="Tags (comma separated)" style="flex:1;padding:0.5rem;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;">
+                        <button class="btn btn-sm btn-primary" id="memory-save-btn">Save</button>
+                        <button class="btn btn-sm" id="memory-cancel-btn">Cancel</button>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-primary" id="new-memory-btn" style="margin-bottom:1rem;">+ Save Memory</button>
+                <div id="memory-list" class="card-list">
+                    <div class="empty-state"><p>No memories found</p></div>
+                </div>
+            </section>
+
+            <!-- Tools Page -->
+            <section id="page-tools" class="page">
+                <div class="page-header">
+                    <h2>Tools</h2>
+                    <button class="btn btn-sm" id="refresh-tools-btn">Refresh</button>
+                </div>
+                <div id="tools-list" class="card-list">
+                    <div class="empty-state"><p>Loading tools...</p></div>
+                </div>
+            </section>
+
+            <!-- Routines Page -->
+            <section id="page-routines" class="page">
+                <div class="page-header">
+                    <h2>Routines</h2>
+                    <button class="btn btn-sm btn-primary" id="new-routine-btn">+ New Routine</button>
+                </div>
+                <div id="routine-form" style="display:none; margin-bottom:1rem; padding:1rem; background:var(--bg-secondary); border-radius:8px;">
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                        <input type="text" id="routine-name" placeholder="Routine name" style="padding:0.5rem;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;">
+                        <input type="text" id="routine-schedule" placeholder="Cron schedule, e.g. */5 * * * *" style="padding:0.5rem;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;">
+                        <textarea id="routine-instruction" placeholder="Instruction (what the agent should do)" rows="2" style="width:100%;padding:0.5rem;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;resize:vertical;"></textarea>
+                        <div style="display:flex;gap:0.5rem;">
+                            <button class="btn btn-sm btn-primary" id="routine-save-btn">Create</button>
+                            <button class="btn btn-sm" id="routine-cancel-btn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="routines-list" class="card-list">
+                    <div class="empty-state"><p>No routines configured</p></div>
+                </div>
+            </section>
+
+            <!-- Jobs Page -->
+            <section id="page-jobs" class="page">
+                <div class="page-header">
+                    <h2>Jobs</h2>
+                    <button class="btn btn-sm" id="refresh-jobs-btn">Refresh</button>
+                </div>
+                <div id="jobs-list" class="card-list">
+                    <div class="empty-state"><p>No jobs</p></div>
+                </div>
+            </section>
+
+            <!-- Logs Page -->
+            <section id="page-logs" class="page">
+                <div class="page-header">
+                    <h2>Logs</h2>
+                    <div class="header-actions">
+                        <label><input type="checkbox" id="log-autoscroll" checked> Auto-scroll</label>
+                        <button class="btn btn-sm" id="clear-logs-btn">Clear</button>
+                    </div>
+                </div>
+                <div id="log-container" class="log-viewer">
+                    <div class="empty-state"><p>Waiting for events...</p></div>
+                </div>
+            </section>
+
+            <!-- Settings Page -->
+            <section id="page-settings" class="page">
+                <div class="page-header">
+                    <h2>Settings</h2>
+                    <button class="btn btn-sm btn-primary" id="save-settings-btn">Save</button>
+                </div>
+                <div class="settings-grid">
+                    <div class="settings-section">
+                        <h3>Configuration</h3>
+                        <pre id="config-display" class="code-block">Loading...</pre>
+                    </div>
+                    <div class="settings-section">
+                        <h3>Status</h3>
+                        <div id="status-details" class="status-grid">
+                            <div class="status-item"><span class="label">Status</span><span class="value" id="status-status">—</span></div>
+                            <div class="status-item"><span class="label">Uptime</span><span class="value" id="status-uptime">—</span></div>
+                            <div class="status-item"><span class="label">Conversations</span><span class="value" id="status-conversations">—</span></div>
+                            <div class="status-item"><span class="label">Memory Entries</span><span class="value" id="status-memory">—</span></div>
+                            <div class="status-item"><span class="label">Documents</span><span class="value" id="status-documents">—</span></div>
+                            <div class="status-item"><span class="label">Tools</span><span class="value" id="status-tools">—</span></div>
+                            <div class="status-item"><span class="label">Provider</span><span class="value" id="status-provider">—</span></div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>Channels</h3>
+                        <div id="channels-list" class="card-list">
+                            <div class="empty-state"><p>Loading...</p></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
