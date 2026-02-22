@@ -2,11 +2,13 @@ name: Benchmarks
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, ci/benchmarks]
     paths:
       - 'crates/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - '.github/workflows/**'
+      - 'README.md'
   workflow_dispatch:        # manual trigger anytime
 
 env:
