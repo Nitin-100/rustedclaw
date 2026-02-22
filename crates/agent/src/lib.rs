@@ -17,11 +17,10 @@ pub mod patterns;
 pub mod stream_event;
 
 pub use context::{
-    AssembledContext, AssemblyError, AssemblyInput, AssemblyMetadata,
-    ContextAssembler, DropInfo, KnowledgeChunk, LayerStats,
-    PerLayerBudget, TokenBudget, WorkingMemory,
+    AssembledContext, AssemblyError, AssemblyInput, AssemblyMetadata, ContextAssembler, DropInfo,
+    KnowledgeChunk, LayerStats, PerLayerBudget, TokenBudget, WorkingMemory,
 };
 pub use loop_runner::AgentLoop;
-pub use patterns::{ReactAgent, ReactResult, RagAgent, RagResult};
-pub use patterns::{CoordinatorAgent, CoordinationResult, SubTaskResult};
+pub use patterns::{CoordinationResult, CoordinatorAgent, SubTaskResult};
+pub use patterns::{RagAgent, RagResult, ReactAgent, ReactResult};
 pub use stream_event::AgentStreamEvent;

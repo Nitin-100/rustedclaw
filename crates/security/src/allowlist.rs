@@ -214,10 +214,7 @@ mod tests {
 
     #[test]
     fn matching_endpoint_allowed() {
-        let allowed = vec![
-            "https://api.example.com".into(),
-            "https://myapp.com".into(),
-        ];
+        let allowed = vec!["https://api.example.com".into(), "https://myapp.com".into()];
         assert_eq!(
             AllowlistPolicy::check_endpoint("https://api.example.com/v1/data", &allowed),
             SenderCheckResult::Allowed
@@ -227,8 +224,7 @@ mod tests {
     #[test]
     fn non_matching_endpoint_denied() {
         let allowed = vec!["https://api.example.com".into()];
-        let result =
-            AllowlistPolicy::check_endpoint("https://evil.com/steal", &allowed);
+        let result = AllowlistPolicy::check_endpoint("https://evil.com/steal", &allowed);
         match result {
             SenderCheckResult::Denied { .. } => {}
             _ => panic!("Expected denied"),
@@ -240,8 +236,7 @@ mod tests {
         let _allowed: Vec<String> = vec!["*".into()]; // Even with wildcard
         // But with endpoint list, private IPs should be blocked
         let specific = vec!["https://api.example.com".into()];
-        let result =
-            AllowlistPolicy::check_endpoint("http://127.0.0.1:8080/admin", &specific);
+        let result = AllowlistPolicy::check_endpoint("http://127.0.0.1:8080/admin", &specific);
         match result {
             SenderCheckResult::Denied { reason, .. } => {
                 assert!(reason.contains("SSRF"));
@@ -253,10 +248,8 @@ mod tests {
     #[test]
     fn ssrf_metadata_blocked() {
         let specific = vec!["https://api.example.com".into()];
-        let result = AllowlistPolicy::check_endpoint(
-            "http://169.254.169.254/latest/meta-data/",
-            &specific,
-        );
+        let result =
+            AllowlistPolicy::check_endpoint("http://169.254.169.254/latest/meta-data/", &specific);
         match result {
             SenderCheckResult::Denied { .. } => {}
             _ => panic!("Expected SSRF block"),

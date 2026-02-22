@@ -9,7 +9,9 @@ pub struct NoopMemory;
 
 #[async_trait]
 impl MemoryBackend for NoopMemory {
-    fn name(&self) -> &str { "none" }
+    fn name(&self) -> &str {
+        "none"
+    }
 
     async fn store(&self, _entry: MemoryEntry) -> Result<String, MemoryError> {
         Ok(String::new())

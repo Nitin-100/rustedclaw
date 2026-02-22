@@ -147,16 +147,27 @@ mod tests {
 
     #[async_trait]
     impl Channel for MockChannel {
-        fn name(&self) -> &str { &self.name }
-        fn id(&self) -> &ChannelId { &self.channel_id }
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn id(&self) -> &ChannelId {
+            &self.channel_id
+        }
 
-        async fn start(&self) -> Result<mpsc::Receiver<Result<ChannelMessage, ChannelError>>, ChannelError> {
+        async fn start(
+            &self,
+        ) -> Result<mpsc::Receiver<Result<ChannelMessage, ChannelError>>, ChannelError> {
             self.started.store(true, Ordering::SeqCst);
             let (_tx, rx) = mpsc::channel(1);
             Ok(rx)
         }
 
-        async fn send(&self, _chat_id: &str, _content: &str, _reply_to: Option<&str>) -> Result<(), ChannelError> {
+        async fn send(
+            &self,
+            _chat_id: &str,
+            _content: &str,
+            _reply_to: Option<&str>,
+        ) -> Result<(), ChannelError> {
             Ok(())
         }
 

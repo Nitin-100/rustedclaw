@@ -9,13 +9,13 @@
 //! All patterns use the context assembly pipeline (FR-2) and working
 //! memory (FR-5) for structured reasoning.
 
-pub mod react;
-pub mod rag;
 pub mod coordinator;
+pub mod rag;
+pub mod react;
 
-pub use react::{ReactAgent, ReactResult};
+pub use coordinator::{CoordinationResult, CoordinatorAgent, SubTaskResult};
 pub use rag::{RagAgent, RagResult};
-pub use coordinator::{CoordinatorAgent, CoordinationResult, SubTaskResult};
+pub use react::{ReactAgent, ReactResult};
 
 #[cfg(test)]
 pub(crate) mod test_helpers;

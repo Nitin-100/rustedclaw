@@ -62,13 +62,11 @@ impl FileBackend {
         content
             .lines()
             .filter(|line| !line.trim().is_empty())
-            .filter_map(|line| {
-                match serde_json::from_str::<MemoryEntry>(line) {
-                    Ok(entry) => Some(entry),
-                    Err(e) => {
-                        warn!(error = %e, "Skipping corrupted memory entry");
-                        None
-                    }
+            .filter_map(|line| match serde_json::from_str::<MemoryEntry>(line) {
+                Ok(entry) => Some(entry),
+                Err(e) => {
+                    warn!(error = %e, "Skipping corrupted memory entry");
+                    None
                 }
             })
             .collect()
@@ -94,9 +92,8 @@ impl FileBackend {
             content.push('\n');
         }
 
-        std::fs::write(&self.path, &content).map_err(|e| {
-            MemoryError::Storage(format!("Failed to write memory file: {e}"))
-        })?;
+        std::fs::write(&self.path, &content)
+            .map_err(|e| MemoryError::Storage(format!("Failed to write memory file: {e}")))?;
 
         Ok(())
     }
@@ -228,9 +225,13 @@ mod tests {
         drop(tmp);
 
         let mem = FileBackend::new(path);
-        mem.store(test_entry("The user prefers Rust")).await.unwrap();
+        mem.store(test_entry("The user prefers Rust"))
+            .await
+            .unwrap();
         mem.store(test_entry("Python is also good")).await.unwrap();
-        mem.store(test_entry("Rust has great performance")).await.unwrap();
+        mem.store(test_entry("Rust has great performance"))
+            .await
+            .unwrap();
 
         let query = MemoryQuery {
             text: "rust".into(),

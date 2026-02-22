@@ -15,7 +15,7 @@ pub fn estimate_tokens(text: &str) -> usize {
     if text.is_empty() {
         return 0;
     }
-    (text.len() + 3) / 4
+    text.len().div_ceil(4)
 }
 
 /// Estimate tokens for a single message including per-message overhead.
@@ -29,7 +29,7 @@ pub fn estimate_message_tokens(message: &Message) -> usize {
 
 /// Estimate tokens for a slice of messages.
 pub fn estimate_messages_tokens(messages: &[Message]) -> usize {
-    messages.iter().map(|m| estimate_message_tokens(m)).sum()
+    messages.iter().map(estimate_message_tokens).sum()
 }
 
 /// Estimate tokens for a tool definition (serialized as JSON).
@@ -40,7 +40,7 @@ pub fn estimate_tool_tokens(tool: &ToolDefinition) -> usize {
 
 /// Estimate tokens for a slice of tool definitions.
 pub fn estimate_tools_tokens(tools: &[ToolDefinition]) -> usize {
-    tools.iter().map(|t| estimate_tool_tokens(t)).sum()
+    tools.iter().map(estimate_tool_tokens).sum()
 }
 
 #[cfg(test)]
@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn multiple_messages() {
         let msgs = vec![
-            Message::user("hello"),     // 5 chars → 2 tokens + 4 overhead = 6
+            Message::user("hello"),      // 5 chars → 2 tokens + 4 overhead = 6
             Message::assistant("world"), // 5 chars → 2 tokens + 4 overhead = 6
         ];
         assert_eq!(estimate_messages_tokens(&msgs), 12);

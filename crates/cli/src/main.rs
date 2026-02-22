@@ -215,42 +215,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         Commands::Estop { resume } => commands::estop::run(resume).await?,
 
-        Commands::Migrate { source, dry_run, path } => {
-            match source {
-                MigrateSource::Openclaw => commands::migrate::run_openclaw(dry_run, path).await?,
-            }
-        }
+        Commands::Migrate {
+            source,
+            dry_run,
+            path,
+        } => match source {
+            MigrateSource::Openclaw => commands::migrate::run_openclaw(dry_run, path).await?,
+        },
 
-        Commands::Routine { action } => {
-            match action {
-                RoutineAction::List => commands::routine::list().await?,
-                RoutineAction::Add { name, schedule, prompt } => {
-                    commands::routine::add(&name, &schedule, &prompt).await?
-                }
-                RoutineAction::Remove { name } => commands::routine::remove(&name).await?,
-                RoutineAction::Pause { name } => commands::routine::pause(&name).await?,
-                RoutineAction::Resume { name } => commands::routine::resume(&name).await?,
-            }
-        }
+        Commands::Routine { action } => match action {
+            RoutineAction::List => commands::routine::list().await?,
+            RoutineAction::Add {
+                name,
+                schedule,
+                prompt,
+            } => commands::routine::add(&name, &schedule, &prompt).await?,
+            RoutineAction::Remove { name } => commands::routine::remove(&name).await?,
+            RoutineAction::Pause { name } => commands::routine::pause(&name).await?,
+            RoutineAction::Resume { name } => commands::routine::resume(&name).await?,
+        },
 
-        Commands::Memory { action } => {
-            match action {
-                MemoryAction::Stats => commands::memory::stats().await?,
-                MemoryAction::Search { query, limit } => {
-                    commands::memory::search(&query, limit).await?
-                }
-                MemoryAction::Export { output } => commands::memory::export(&output).await?,
-                MemoryAction::Clear { confirm } => commands::memory::clear(confirm).await?,
+        Commands::Memory { action } => match action {
+            MemoryAction::Stats => commands::memory::stats().await?,
+            MemoryAction::Search { query, limit } => {
+                commands::memory::search(&query, limit).await?
             }
-        }
+            MemoryAction::Export { output } => commands::memory::export(&output).await?,
+            MemoryAction::Clear { confirm } => commands::memory::clear(confirm).await?,
+        },
 
-        Commands::Config { action } => {
-            match action {
-                ConfigAction::Validate => commands::config_cmd::validate().await?,
-                ConfigAction::Show => commands::config_cmd::show().await?,
-                ConfigAction::Path => commands::config_cmd::path().await?,
-            }
-        }
+        Commands::Config { action } => match action {
+            ConfigAction::Validate => commands::config_cmd::validate().await?,
+            ConfigAction::Show => commands::config_cmd::show().await?,
+            ConfigAction::Path => commands::config_cmd::path().await?,
+        },
 
         Commands::Providers => commands::providers::run().await?,
 

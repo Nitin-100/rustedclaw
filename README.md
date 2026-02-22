@@ -9,6 +9,8 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Nitin-100/rustedclaw/actions/workflows/ci.yml"><img src="https://github.com/Nitin-100/rustedclaw/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/Nitin-100/rustedclaw/actions/workflows/bench.yml"><img src="https://github.com/Nitin-100/rustedclaw/actions/workflows/bench.yml/badge.svg" alt="Benchmarks"></a>
   <a href="#-quick-start"><img src="https://img.shields.io/badge/get_started-2_min-brightgreen?style=for-the-badge" alt="Get Started"></a>
   <a href="#-benchmarks"><img src="https://img.shields.io/badge/RAM-~1_MB-critical?style=for-the-badge" alt="RAM"></a>
   <a href="#-benchmarks"><img src="https://img.shields.io/badge/binary-3.9_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>

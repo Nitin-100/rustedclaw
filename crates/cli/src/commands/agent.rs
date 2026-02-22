@@ -1,6 +1,5 @@
 //! `rustedclaw agent` — Interactive or single-message chat mode.
 
-use std::sync::Arc;
 use rustedclaw_agent::AgentLoop;
 use rustedclaw_channels::CliChannel;
 use rustedclaw_config::AppConfig;
@@ -8,6 +7,7 @@ use rustedclaw_core::channel::Channel;
 use rustedclaw_core::event::EventBus;
 use rustedclaw_core::identity::{ContextPaths, Identity};
 use rustedclaw_core::message::{Conversation, Message};
+use std::sync::Arc;
 
 pub async fn run(message: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
     let config = AppConfig::load().map_err(|e| format!("Failed to load config: {e}"))?;
@@ -23,7 +23,10 @@ pub async fn run(message: Option<String>) -> Result<(), Box<dyn std::error::Erro
         eprintln!("    $env:RUSTEDCLAW_API_KEY   = 'sk-...'         (generic)");
         eprintln!();
         eprintln!("  Or add it to your config file:");
-        eprintln!("    {}", AppConfig::config_dir().join("config.toml").display());
+        eprintln!(
+            "    {}",
+            AppConfig::config_dir().join("config.toml").display()
+        );
         eprintln!();
         eprintln!("  Get an OpenRouter key at: https://openrouter.ai/keys");
         eprintln!();
@@ -47,7 +50,9 @@ pub async fn run(message: Option<String>) -> Result<(), Box<dyn std::error::Erro
     let context_paths = ContextPaths {
         global_dir: Some(AppConfig::workspace_dir()),
         project_dir,
-        extra_files: config.identity.extra_context_files
+        extra_files: config
+            .identity
+            .extra_context_files
             .iter()
             .map(std::path::PathBuf::from)
             .collect(),
@@ -75,7 +80,8 @@ pub async fn run(message: Option<String>) -> Result<(), Box<dyn std::error::Erro
         tools,
         identity,
         event_bus,
-    ).with_max_tokens(config.default_max_tokens);
+    )
+    .with_max_tokens(config.default_max_tokens);
 
     if let Some(msg) = message {
         // Single message mode
@@ -96,7 +102,10 @@ pub async fn run(message: Option<String>) -> Result<(), Box<dyn std::error::Erro
         println!("  Provider:  {}", config.default_provider);
         println!("  Model:     {}", config.default_model);
         println!("  Tools:     shell, file_read, file_write");
-        println!("  Context:   {} files loaded (~{} tokens)", context_files_count, context_tokens);
+        println!(
+            "  Context:   {} files loaded (~{} tokens)",
+            context_files_count, context_tokens
+        );
         println!("  Agent:     {}", agent_name);
         println!();
         println!("  Type your message and press Enter.");
@@ -104,7 +113,10 @@ pub async fn run(message: Option<String>) -> Result<(), Box<dyn std::error::Erro
         println!();
 
         let channel = CliChannel::new();
-        let mut rx = channel.start().await.map_err(|e| format!("Channel error: {e}"))?;
+        let mut rx = channel
+            .start()
+            .await
+            .map_err(|e| format!("Channel error: {e}"))?;
         let mut conv = Conversation::new();
 
         print!("  You > ");

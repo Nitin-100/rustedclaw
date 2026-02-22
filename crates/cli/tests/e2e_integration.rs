@@ -6,8 +6,8 @@
 use std::sync::Arc;
 
 use rustedclaw_agent::{
-    AssemblyInput, ContextAssembler, KnowledgeChunk, ReactAgent, RagAgent,
-    CoordinatorAgent, TokenBudget, WorkingMemory,
+    AssemblyInput, ContextAssembler, CoordinatorAgent, KnowledgeChunk, RagAgent, ReactAgent,
+    TokenBudget, WorkingMemory,
 };
 use rustedclaw_core::error::ProviderError;
 use rustedclaw_core::event::EventBus;
@@ -37,11 +37,7 @@ impl ScriptedProvider {
         Self::new(vec![text_response(response)])
     }
 
-    fn tool_then_text(
-        tool_calls: Vec<MessageToolCall>,
-        thought: &str,
-        answer: &str,
-    ) -> Self {
+    fn tool_then_text(tool_calls: Vec<MessageToolCall>, thought: &str, answer: &str) -> Self {
         Self::new(vec![
             tool_response(tool_calls, thought),
             text_response(answer),
@@ -59,10 +55,7 @@ impl Provider for ScriptedProvider {
         "e2e_mock"
     }
 
-    async fn complete(
-        &self,
-        _request: ProviderRequest,
-    ) -> Result<ProviderResponse, ProviderError> {
+    async fn complete(&self, _request: ProviderRequest) -> Result<ProviderResponse, ProviderError> {
         let mut count = self.call_count.lock().unwrap();
         let responses = self.responses.lock().unwrap();
         if *count >= responses.len() {
@@ -134,14 +127,7 @@ async fn e2e_react_calculator_tool_invocation() {
     let event_bus = Arc::new(EventBus::default());
     let mut conv = Conversation::new();
 
-    let agent = ReactAgent::new(
-        provider.clone(),
-        "mock",
-        0.7,
-        tools,
-        identity,
-        event_bus,
-    );
+    let agent = ReactAgent::new(provider.clone(), "mock", 0.7, tools, identity, event_bus);
 
     let result = agent
         .run("what is 2+2?", &mut conv, &[], &[])
@@ -176,29 +162,22 @@ async fn e2e_react_web_search_then_answer() {
     let event_bus = Arc::new(EventBus::default());
     let mut conv = Conversation::new();
 
-    let agent = ReactAgent::new(
-        provider.clone(),
-        "mock",
-        0.7,
-        tools,
-        identity,
-        event_bus,
-    );
+    let agent = ReactAgent::new(provider.clone(), "mock", 0.7, tools, identity, event_bus);
 
     let result = agent
         .run("Tell me about Rust", &mut conv, &[], &[])
         .await
         .expect("Agent should succeed");
 
-    assert!(result
-        .answer
-        .contains("Rust"));
+    assert!(result.answer.contains("Rust"));
     assert_eq!(result.tool_calls_made, 1);
 }
 
 #[tokio::test]
 async fn e2e_react_with_long_term_memories() {
-    let provider = Arc::new(ScriptedProvider::text("Based on your preference for dark themes, I recommend using a dark color scheme."));
+    let provider = Arc::new(ScriptedProvider::text(
+        "Based on your preference for dark themes, I recommend using a dark color scheme.",
+    ));
 
     let tools = Arc::new(default_registry());
     let identity = Identity::default();
@@ -216,14 +195,7 @@ async fn e2e_react_with_long_term_memories() {
         embedding: None,
     }];
 
-    let agent = ReactAgent::new(
-        provider.clone(),
-        "mock",
-        0.7,
-        tools,
-        identity,
-        event_bus,
-    );
+    let agent = ReactAgent::new(provider.clone(), "mock", 0.7, tools, identity, event_bus);
 
     let result = agent
         .run("What theme should I use?", &mut conv, &memories, &[])
@@ -247,14 +219,7 @@ async fn e2e_react_direct_answer_no_tools() {
     let event_bus = Arc::new(EventBus::default());
     let mut conv = Conversation::new();
 
-    let agent = ReactAgent::new(
-        provider.clone(),
-        "mock",
-        0.7,
-        tools,
-        identity,
-        event_bus,
-    );
+    let agent = ReactAgent::new(provider.clone(), "mock", 0.7, tools, identity, event_bus);
 
     let result = agent
         .run("Hi there!", &mut conv, &[], &[])
@@ -275,7 +240,9 @@ async fn e2e_rag_knowledge_grounded_response() {
     let provider = Arc::new(ScriptedProvider::new(vec![
         // First call: the RAG agent makes the knowledge_base_query tool call internally
         // by calling the tool directly, then assembles context and generates.
-        text_response("Based on the retrieved knowledge, Rust's ownership system ensures memory safety without garbage collection."),
+        text_response(
+            "Based on the retrieved knowledge, Rust's ownership system ensures memory safety without garbage collection.",
+        ),
     ]));
 
     let tools = Arc::new(default_registry());
@@ -283,14 +250,7 @@ async fn e2e_rag_knowledge_grounded_response() {
     let event_bus = Arc::new(EventBus::default());
     let mut conv = Conversation::new();
 
-    let agent = RagAgent::new(
-        provider.clone(),
-        "mock",
-        0.7,
-        tools,
-        identity,
-        event_bus,
-    );
+    let agent = RagAgent::new(provider.clone(), "mock", 0.7, tools, identity, event_bus);
 
     let result = agent
         .run("How does Rust handle memory?", &mut conv, &[])
@@ -307,7 +267,9 @@ async fn e2e_rag_knowledge_grounded_response() {
 
 #[tokio::test]
 async fn e2e_rag_with_existing_memories() {
-    let provider = Arc::new(ScriptedProvider::text("Considering your background in Python and the retrieved Rust documentation, here's a comparison..."));
+    let provider = Arc::new(ScriptedProvider::text(
+        "Considering your background in Python and the retrieved Rust documentation, here's a comparison...",
+    ));
 
     let tools = Arc::new(default_registry());
     let identity = Identity::default();
@@ -325,14 +287,7 @@ async fn e2e_rag_with_existing_memories() {
         embedding: None,
     }];
 
-    let agent = RagAgent::new(
-        provider.clone(),
-        "mock",
-        0.7,
-        tools,
-        identity,
-        event_bus,
-    );
+    let agent = RagAgent::new(provider.clone(), "mock", 0.7, tools, identity, event_bus);
 
     let result = agent
         .run("Compare Rust and Python", &mut conv, &memories)
@@ -354,11 +309,17 @@ async fn e2e_coordinator_decomposes_and_delegates() {
         // Coordinator decomposition response (must use "WORKER: task" format per parser).
         text_response("researcher: Research Rust advantages\nwriter: Write summary"),
         // Worker 1 (researcher) response.
-        text_response("Rust advantages: memory safety, zero-cost abstractions, fearless concurrency."),
+        text_response(
+            "Rust advantages: memory safety, zero-cost abstractions, fearless concurrency.",
+        ),
         // Worker 2 (writer) response.
-        text_response("Rust is a modern systems programming language offering memory safety without garbage collection."),
+        text_response(
+            "Rust is a modern systems programming language offering memory safety without garbage collection.",
+        ),
         // Coordinator aggregation response.
-        text_response("Rust offers memory safety, zero-cost abstractions, and fearless concurrency. It is a modern systems programming language that achieves memory safety without garbage collection."),
+        text_response(
+            "Rust offers memory safety, zero-cost abstractions, and fearless concurrency. It is a modern systems programming language that achieves memory safety without garbage collection.",
+        ),
     ]));
 
     let tools = Arc::new(default_registry());
@@ -366,16 +327,9 @@ async fn e2e_coordinator_decomposes_and_delegates() {
     let event_bus = Arc::new(EventBus::default());
     let _conv = Conversation::new();
 
-    let agent = CoordinatorAgent::new(
-        provider.clone(),
-        "mock",
-        0.7,
-        tools,
-        identity,
-        event_bus,
-    )
-    .add_worker("researcher", "Researches topics")
-    .add_worker("writer", "Writes summaries");
+    let agent = CoordinatorAgent::new(provider.clone(), "mock", 0.7, tools, identity, event_bus)
+        .add_worker("researcher", "Researches topics")
+        .add_worker("writer", "Writes summaries");
 
     let result = agent
         .run("Write a summary of Rust's advantages", &[])
@@ -402,8 +356,10 @@ async fn e2e_context_assembly_full_layers() {
 
     let assembler = ContextAssembler::new(budget);
 
-    let mut identity = Identity::default();
-    identity.system_prompt = "You are a helpful AI assistant.".into();
+    let identity = Identity {
+        system_prompt: "You are a helpful AI assistant.".into(),
+        ..Identity::default()
+    };
 
     let memories = vec![MemoryEntry {
         id: "m1".into(),
@@ -418,7 +374,10 @@ async fn e2e_context_assembly_full_layers() {
 
     let mut wm = WorkingMemory::default();
     wm.add_thought("The user wants to know about error handling");
-    wm.set_plan("Explain Rust error handling", vec!["overview".to_string(), "examples".to_string()]);
+    wm.set_plan(
+        "Explain Rust error handling",
+        vec!["overview".to_string(), "examples".to_string()],
+    );
 
     let chunks = vec![KnowledgeChunk {
         document_id: "doc1".into(),
@@ -520,12 +479,15 @@ async fn e2e_working_memory_full_lifecycle() {
     let mut wm = WorkingMemory::default();
 
     // Phase 1: Set a plan.
-    wm.set_plan("Build a web server", vec![
-        "Choose framework".to_string(),
-        "Implement routes".to_string(),
-        "Add middleware".to_string(),
-        "Deploy".to_string(),
-    ]);
+    wm.set_plan(
+        "Build a web server",
+        vec![
+            "Choose framework".to_string(),
+            "Implement routes".to_string(),
+            "Add middleware".to_string(),
+            "Deploy".to_string(),
+        ],
+    );
     assert!(!wm.is_plan_complete());
 
     // Phase 2: Record thoughts and actions.
@@ -582,8 +544,13 @@ async fn e2e_all_tools_executable() {
     assert!(names.len() >= 7);
 
     let expected_tools = [
-        "shell", "file_read", "file_write",
-        "web_search", "calculator", "weather_lookup", "knowledge_base_query",
+        "shell",
+        "file_read",
+        "file_write",
+        "web_search",
+        "calculator",
+        "weather_lookup",
+        "knowledge_base_query",
     ];
 
     for tool_name in &expected_tools {
@@ -776,14 +743,12 @@ async fn e2e_gateway_health_and_tools() {
         ))
     };
 
-    let state = Arc::new(tokio::sync::RwLock::new(
-        rustedclaw_gateway::GatewayState {
-            config,
-            pairing_code: None,
-            bearer_tokens: Vec::new(),
-            agent,
-        },
-    ));
+    let state = Arc::new(tokio::sync::RwLock::new(rustedclaw_gateway::GatewayState {
+        config,
+        pairing_code: None,
+        bearer_tokens: Vec::new(),
+        agent,
+    }));
 
     let app = rustedclaw_gateway::build_router(state);
 
@@ -842,16 +807,15 @@ async fn e2e_event_bus_pubsub() {
     });
 
     // Receive events.
-    let event1 = tokio::time::timeout(
-        std::time::Duration::from_millis(100),
-        rx.recv(),
-    )
-    .await
-    .expect("Should receive event")
-    .expect("Channel should be open");
+    let event1 = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv())
+        .await
+        .expect("Should receive event")
+        .expect("Channel should be open");
 
     match event1.as_ref() {
-        DomainEvent::ToolExecuted { tool_name, success, .. } => {
+        DomainEvent::ToolExecuted {
+            tool_name, success, ..
+        } => {
             assert_eq!(tool_name, "calculator");
             assert!(*success);
         }

@@ -13,21 +13,12 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 /// Web channel configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct WebConfig {
     /// Bearer tokens that are allowed to connect.
     pub bearer_tokens: Vec<String>,
     /// Whether to require authentication (default: true).
     pub require_auth: bool,
-}
-
-impl Default for WebConfig {
-    fn default() -> Self {
-        Self {
-            bearer_tokens: vec![],
-            require_auth: false,
-        }
-    }
 }
 
 /// Web channel adapter — bridges HTTP/WebSocket clients to the agent.
@@ -54,11 +45,13 @@ impl WebChannel {
     pub async fn inject_message(&self, msg: ChannelMessage) -> Result<(), ChannelError> {
         let guard = self.inject_tx.lock().await;
         if let Some(tx) = guard.as_ref() {
-            tx.send(Ok(msg)).await.map_err(|_| {
-                ChannelError::ConnectionLost("Message channel closed".into())
-            })
+            tx.send(Ok(msg))
+                .await
+                .map_err(|_| ChannelError::ConnectionLost("Message channel closed".into()))
         } else {
-            Err(ChannelError::ConnectionLost("Web channel not started".into()))
+            Err(ChannelError::ConnectionLost(
+                "Web channel not started".into(),
+            ))
         }
     }
 
@@ -82,23 +75,37 @@ impl WebChannel {
 
 #[async_trait]
 impl Channel for WebChannel {
-    fn name(&self) -> &str { "web" }
+    fn name(&self) -> &str {
+        "web"
+    }
 
-    fn id(&self) -> &ChannelId { &self.channel_id }
+    fn id(&self) -> &ChannelId {
+        &self.channel_id
+    }
 
-    async fn start(&self) -> Result<mpsc::Receiver<Result<ChannelMessage, ChannelError>>, ChannelError> {
+    async fn start(
+        &self,
+    ) -> Result<mpsc::Receiver<Result<ChannelMessage, ChannelError>>, ChannelError> {
         info!("Web channel starting");
         let (tx, rx) = mpsc::channel(64);
         *self.inject_tx.lock().await = Some(tx);
         Ok(rx)
     }
 
-    async fn send(&self, chat_id: &str, content: &str, _reply_to: Option<&str>) -> Result<(), ChannelError> {
+    async fn send(
+        &self,
+        chat_id: &str,
+        content: &str,
+        _reply_to: Option<&str>,
+    ) -> Result<(), ChannelError> {
         let outbound = self.outbound.lock().await;
         if let Some(tx) = outbound.get(chat_id) {
-            tx.send(content.to_string()).await.map_err(|_| {
-                ChannelError::DeliveryFailed { channel: "web".into(), reason: format!("Session '{}' disconnected", chat_id) }
-            })
+            tx.send(content.to_string())
+                .await
+                .map_err(|_| ChannelError::DeliveryFailed {
+                    channel: "web".into(),
+                    reason: format!("Session '{}' disconnected", chat_id),
+                })
         } else {
             info!(chat_id = %chat_id, "No active session — message buffered");
             Ok(()) // No active session; in production, buffer or discard

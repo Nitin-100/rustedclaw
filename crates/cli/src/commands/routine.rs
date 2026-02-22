@@ -9,7 +9,9 @@ pub async fn list() -> Result<(), Box<dyn std::error::Error>> {
         println!("📋 No routines configured.");
         println!();
         println!("   Add one with:");
-        println!("   rustedclaw routine add \"daily_check\" \"0 9 * * *\" \"Summarize my pending tasks\"");
+        println!(
+            "   rustedclaw routine add \"daily_check\" \"0 9 * * *\" \"Summarize my pending tasks\""
+        );
         return Ok(());
     }
 
@@ -34,7 +36,11 @@ pub async fn list() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub async fn add(name: &str, schedule: &str, prompt: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn add(
+    name: &str,
+    schedule: &str,
+    prompt: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::load().map_err(|e| format!("Failed to load config: {e}"))?;
 
     // Check for duplicate name
@@ -44,7 +50,7 @@ pub async fn add(name: &str, schedule: &str, prompt: &str) -> Result<(), Box<dyn
     }
 
     // Validate cron expression (basic check)
-    let fields: Vec<&str> = schedule.trim().split_whitespace().collect();
+    let fields: Vec<&str> = schedule.split_whitespace().collect();
     if fields.len() != 5 {
         println!("❌ Invalid cron expression: expected 5 fields (minute hour dom month dow)");
         println!("   Example: \"*/30 * * * *\" = every 30 minutes");

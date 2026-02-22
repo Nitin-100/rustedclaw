@@ -34,7 +34,10 @@ fn dirs_home() -> PathBuf {
     }
 }
 
-pub async fn run_openclaw(dry_run: bool, path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_openclaw(
+    dry_run: bool,
+    path: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔄 Migrating from OpenClaw...");
 
     let source = match path {
@@ -47,7 +50,7 @@ pub async fn run_openclaw(dry_run: bool, path: Option<String>) -> Result<(), Box
                 println!("   rustedclaw migrate openclaw --path ~/.config/openclaw");
                 return Ok(());
             }
-        }
+        },
     };
 
     println!("   Source: {}", source.display());

@@ -14,14 +14,14 @@
 //! The loop terminates when the LLM returns a response with no tool
 //! calls, or when max iterations is reached.
 
-use std::sync::Arc;
+use chrono::Utc;
 use rustedclaw_core::event::{DomainEvent, EventBus};
 use rustedclaw_core::identity::Identity;
 use rustedclaw_core::memory::{MemoryBackend, MemoryEntry, MemoryQuery, SearchMode};
 use rustedclaw_core::message::{Conversation, Message};
 use rustedclaw_core::provider::{Provider, ProviderRequest};
 use rustedclaw_core::tool::{ToolCall, ToolRegistry};
-use chrono::Utc;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
@@ -165,7 +165,12 @@ impl ReactAgent {
     }
 
     /// Auto-save a summary of the conversation to memory.
-    async fn auto_save_to_memory(&self, user_message: &str, answer: &str, conversation: &Conversation) {
+    async fn auto_save_to_memory(
+        &self,
+        user_message: &str,
+        answer: &str,
+        conversation: &Conversation,
+    ) {
         let Some(memory) = &self.memory else {
             return;
         };
@@ -178,7 +183,10 @@ impl ReactAgent {
             return;
         }
 
-        let summary = format!("User asked: {}\nAssistant answered: {}", user_message, answer);
+        let summary = format!(
+            "User asked: {}\nAssistant answered: {}",
+            user_message, answer
+        );
 
         let entry = MemoryEntry {
             id: String::new(),
@@ -251,9 +259,12 @@ impl ReactAgent {
                 user_message,
             };
 
-            let assembled = assembler.assemble(&input).map_err(|e| {
-                rustedclaw_core::Error::Config { message: format!("Context assembly failed: {}", e) }
-            })?;
+            let assembled =
+                assembler
+                    .assemble(&input)
+                    .map_err(|e| rustedclaw_core::Error::Config {
+                        message: format!("Context assembly failed: {}", e),
+                    })?;
 
             last_metadata = Some(assembled.metadata.clone());
 
@@ -295,7 +306,8 @@ impl ReactAgent {
                 conversation.push(response.message);
 
                 // ── Auto-save to memory ──
-                self.auto_save_to_memory(user_message, &answer, conversation).await;
+                self.auto_save_to_memory(user_message, &answer, conversation)
+                    .await;
 
                 info!(
                     iterations = wm.iterations,
@@ -351,8 +363,7 @@ impl ReactAgent {
                             timestamp: chrono::Utc::now(),
                         });
 
-                        conversation
-                            .push(Message::tool_result(&tc.id, &tool_result.output));
+                        conversation.push(Message::tool_result(&tc.id, &tool_result.output));
                     }
                     Err(e) => {
                         let error_msg = format!("Error: {}", e);
@@ -430,16 +441,15 @@ impl ReactAgent {
 
             // ── Auto-recall memories ──
             let recalled: Vec<MemoryEntry> = if let Some(mem) = &memory {
-                match mem.search(MemoryQuery {
+                mem.search(MemoryQuery {
                     text: user_msg.clone(),
                     limit: recall_limit,
                     min_score: 0.0,
                     tags: vec![],
                     mode: SearchMode::Hybrid,
-                }).await {
-                    Ok(e) => e,
-                    Err(_) => vec![],
-                }
+                })
+                .await
+                .unwrap_or_default()
             } else {
                 vec![]
             };
@@ -478,9 +488,11 @@ impl ReactAgent {
                 let assembled = match assembler.assemble(&input) {
                     Ok(a) => a,
                     Err(e) => {
-                        let _ = tx.send(AgentStreamEvent::Error {
-                            message: format!("Context assembly failed: {}", e),
-                        }).await;
+                        let _ = tx
+                            .send(AgentStreamEvent::Error {
+                                message: format!("Context assembly failed: {}", e),
+                            })
+                            .await;
                         return;
                     }
                 };
@@ -502,34 +514,41 @@ impl ReactAgent {
                 let mut stream_rx = match provider.stream(request).await {
                     Ok(rx) => rx,
                     Err(e) => {
-                        let _ = tx.send(AgentStreamEvent::Error {
-                            message: format!("Provider error: {}", e),
-                        }).await;
+                        let _ = tx
+                            .send(AgentStreamEvent::Error {
+                                message: format!("Provider error: {}", e),
+                            })
+                            .await;
                         return;
                     }
                 };
 
                 // Accumulate the full response from streaming chunks
                 let mut full_content = String::new();
-                let mut accumulated_tool_calls: Vec<rustedclaw_core::message::MessageToolCall> = Vec::new();
+                let mut accumulated_tool_calls: Vec<rustedclaw_core::message::MessageToolCall> =
+                    Vec::new();
 
                 while let Some(chunk_result) = stream_rx.recv().await {
                     match chunk_result {
                         Ok(chunk) => {
                             // Forward text chunks to client
-                            if let Some(ref text) = chunk.content {
-                                if !text.is_empty() {
-                                    full_content.push_str(text);
-                                    let _ = tx.send(AgentStreamEvent::Chunk {
+                            if let Some(ref text) = chunk.content
+                                && !text.is_empty()
+                            {
+                                full_content.push_str(text);
+                                let _ = tx
+                                    .send(AgentStreamEvent::Chunk {
                                         content: text.clone(),
-                                    }).await;
-                                }
+                                    })
+                                    .await;
                             }
 
                             // Accumulate tool calls
                             for tc in &chunk.tool_calls {
                                 // Merge or add tool call deltas
-                                if let Some(existing) = accumulated_tool_calls.iter_mut().find(|t| t.id == tc.id) {
+                                if let Some(existing) =
+                                    accumulated_tool_calls.iter_mut().find(|t| t.id == tc.id)
+                                {
                                     existing.arguments.push_str(&tc.arguments);
                                 } else {
                                     accumulated_tool_calls.push(tc.clone());
@@ -541,9 +560,11 @@ impl ReactAgent {
                             }
                         }
                         Err(e) => {
-                            let _ = tx.send(AgentStreamEvent::Error {
-                                message: format!("Stream error: {}", e),
-                            }).await;
+                            let _ = tx
+                                .send(AgentStreamEvent::Error {
+                                    message: format!("Stream error: {}", e),
+                                })
+                                .await;
                             return;
                         }
                     }
@@ -561,31 +582,40 @@ impl ReactAgent {
                     conv.push(msg);
 
                     // Auto-save
-                    if auto_save {
-                        if let Some(mem) = &memory {
-                            if user_msg.len() >= 10 && full_content.len() >= 10 {
-                                let summary = format!("User asked: {}\nAssistant answered: {}", user_msg, full_content);
-                                let entry = MemoryEntry {
-                                    id: String::new(),
-                                    content: summary,
-                                    tags: vec!["conversation".into(), "auto-saved".into(), "react-stream".into()],
-                                    source: Some(conv_id.clone()),
-                                    created_at: Utc::now(),
-                                    last_accessed: Utc::now(),
-                                    score: 0.0,
-                                    embedding: None,
-                                };
-                                let _ = mem.store(entry).await;
-                            }
-                        }
+                    if auto_save
+                        && let Some(mem) = &memory
+                        && user_msg.len() >= 10
+                        && full_content.len() >= 10
+                    {
+                        let summary = format!(
+                            "User asked: {}\nAssistant answered: {}",
+                            user_msg, full_content
+                        );
+                        let entry = MemoryEntry {
+                            id: String::new(),
+                            content: summary,
+                            tags: vec![
+                                "conversation".into(),
+                                "auto-saved".into(),
+                                "react-stream".into(),
+                            ],
+                            source: Some(conv_id.clone()),
+                            created_at: Utc::now(),
+                            last_accessed: Utc::now(),
+                            score: 0.0,
+                            embedding: None,
+                        };
+                        let _ = mem.store(entry).await;
                     }
 
-                    let _ = tx.send(AgentStreamEvent::Done {
-                        conversation_id: conv_id,
-                        usage: last_usage,
-                        iterations: wm.iterations,
-                        tool_calls_made: total_tool_calls,
-                    }).await;
+                    let _ = tx
+                        .send(AgentStreamEvent::Done {
+                            conversation_id: conv_id,
+                            usage: last_usage,
+                            iterations: wm.iterations,
+                            tool_calls_made: total_tool_calls,
+                        })
+                        .await;
                     return;
                 }
 
@@ -600,11 +630,13 @@ impl ReactAgent {
                     wm.add_action(&format!("{}({})", tc.name, tc.arguments));
 
                     // Emit tool_call event
-                    let _ = tx.send(AgentStreamEvent::ToolCall {
-                        id: tc.id.clone(),
-                        name: tc.name.clone(),
-                        input: serde_json::from_str(&tc.arguments).unwrap_or_default(),
-                    }).await;
+                    let _ = tx
+                        .send(AgentStreamEvent::ToolCall {
+                            id: tc.id.clone(),
+                            name: tc.name.clone(),
+                            input: serde_json::from_str(&tc.arguments).unwrap_or_default(),
+                        })
+                        .await;
 
                     let call = ToolCall {
                         id: tc.id.clone(),
@@ -633,12 +665,14 @@ impl ReactAgent {
                                 timestamp: Utc::now(),
                             });
 
-                            let _ = tx.send(AgentStreamEvent::ToolResult {
-                                id: tc.id.clone(),
-                                name: tc.name.clone(),
-                                output: tool_result.output.clone(),
-                                success: tool_result.success,
-                            }).await;
+                            let _ = tx
+                                .send(AgentStreamEvent::ToolResult {
+                                    id: tc.id.clone(),
+                                    name: tc.name.clone(),
+                                    output: tool_result.output.clone(),
+                                    success: tool_result.success,
+                                })
+                                .await;
 
                             conv.push(Message::tool_result(&tc.id, &tool_result.output));
                         }
@@ -654,12 +688,14 @@ impl ReactAgent {
                                 timestamp: Utc::now(),
                             });
 
-                            let _ = tx.send(AgentStreamEvent::ToolResult {
-                                id: tc.id.clone(),
-                                name: tc.name.clone(),
-                                output: error_msg.clone(),
-                                success: false,
-                            }).await;
+                            let _ = tx
+                                .send(AgentStreamEvent::ToolResult {
+                                    id: tc.id.clone(),
+                                    name: tc.name.clone(),
+                                    output: error_msg.clone(),
+                                    success: false,
+                                })
+                                .await;
 
                             conv.push(Message::tool_result(&tc.id, &error_msg));
                         }
@@ -668,12 +704,14 @@ impl ReactAgent {
             }
 
             // Max iterations exceeded
-            let _ = tx.send(AgentStreamEvent::Done {
-                conversation_id: conv_id,
-                usage: last_usage,
-                iterations: max_iterations as usize,
-                tool_calls_made: total_tool_calls,
-            }).await;
+            let _ = tx
+                .send(AgentStreamEvent::Done {
+                    conversation_id: conv_id,
+                    usage: last_usage,
+                    iterations: max_iterations as usize,
+                    tool_calls_made: total_tool_calls,
+                })
+                .await;
         });
 
         Ok(rx)
@@ -738,7 +776,10 @@ mod tests {
         );
 
         let mut conv = Conversation::new();
-        let result = agent.run("What is 2+3?", &mut conv, &[], &[]).await.unwrap();
+        let result = agent
+            .run("What is 2+3?", &mut conv, &[], &[])
+            .await
+            .unwrap();
 
         assert_eq!(result.answer, "The result is 5");
         assert_eq!(result.tool_calls_made, 1);
@@ -756,14 +797,8 @@ mod tests {
     #[tokio::test]
     async fn multiple_tool_calls() {
         let tool_calls = vec![
-            make_tool_call(
-                "calculator",
-                serde_json::json!({"expression": "10 * 5"}),
-            ),
-            make_tool_call(
-                "weather_lookup",
-                serde_json::json!({"location": "Tokyo"}),
-            ),
+            make_tool_call("calculator", serde_json::json!({"expression": "10 * 5"})),
+            make_tool_call("weather_lookup", serde_json::json!({"location": "Tokyo"})),
         ];
 
         let provider = Arc::new(SequentialMockProvider::tool_then_answer(
@@ -785,7 +820,12 @@ mod tests {
 
         let mut conv = Conversation::new();
         let result = agent
-            .run("Calculate 10*5 and check Tokyo weather", &mut conv, &[], &[])
+            .run(
+                "Calculate 10*5 and check Tokyo weather",
+                &mut conv,
+                &[],
+                &[],
+            )
             .await
             .unwrap();
 
@@ -827,7 +867,10 @@ mod tests {
         .with_max_iterations(3);
 
         let mut conv = Conversation::new();
-        let result = agent.run("Infinite loop", &mut conv, &[], &[]).await.unwrap();
+        let result = agent
+            .run("Infinite loop", &mut conv, &[], &[])
+            .await
+            .unwrap();
 
         assert!(result.answer.contains("maximum"));
         assert_eq!(result.iterations, 3);
@@ -879,7 +922,10 @@ mod tests {
         use crate::stream_event::AgentStreamEvent;
 
         let (agent, mut conv) = setup_react();
-        let mut rx = agent.run_stream("Hello", &mut conv, &[], &[]).await.unwrap();
+        let mut rx = agent
+            .run_stream("Hello", &mut conv, &[], &[])
+            .await
+            .unwrap();
 
         let mut events = vec![];
         while let Some(event) = rx.recv().await {
@@ -887,11 +933,19 @@ mod tests {
         }
 
         // Should have at least a Chunk and a Done event
-        assert!(events.len() >= 2, "Expected >=2 events, got {}", events.len());
+        assert!(
+            events.len() >= 2,
+            "Expected >=2 events, got {}",
+            events.len()
+        );
 
         // Last event should be Done
         match events.last().unwrap() {
-            AgentStreamEvent::Done { iterations, tool_calls_made, .. } => {
+            AgentStreamEvent::Done {
+                iterations,
+                tool_calls_made,
+                ..
+            } => {
                 assert_eq!(*iterations, 1);
                 assert_eq!(*tool_calls_made, 0);
             }
@@ -899,12 +953,19 @@ mod tests {
         }
 
         // Should have at least one Chunk with "Final answer"
-        let chunks: Vec<_> = events.iter().filter_map(|e| match e {
-            AgentStreamEvent::Chunk { content } => Some(content.as_str()),
-            _ => None,
-        }).collect();
+        let chunks: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                AgentStreamEvent::Chunk { content } => Some(content.as_str()),
+                _ => None,
+            })
+            .collect();
         let full_text: String = chunks.concat();
-        assert!(full_text.contains("Final answer"), "Expected 'Final answer', got '{}'", full_text);
+        assert!(
+            full_text.contains("Final answer"),
+            "Expected 'Final answer', got '{}'",
+            full_text
+        );
     }
 
     #[tokio::test]
@@ -934,7 +995,10 @@ mod tests {
         );
 
         let mut conv = Conversation::new();
-        let mut rx = agent.run_stream("What is 2+3?", &mut conv, &[], &[]).await.unwrap();
+        let mut rx = agent
+            .run_stream("What is 2+3?", &mut conv, &[], &[])
+            .await
+            .unwrap();
 
         let mut events = vec![];
         while let Some(event) = rx.recv().await {
@@ -942,7 +1006,9 @@ mod tests {
         }
 
         // Should contain ToolCall and ToolResult events
-        let has_tool_call = events.iter().any(|e| matches!(e, AgentStreamEvent::ToolCall { name, .. } if name == "calculator"));
+        let has_tool_call = events
+            .iter()
+            .any(|e| matches!(e, AgentStreamEvent::ToolCall { name, .. } if name == "calculator"));
         let has_tool_result = events.iter().any(|e| matches!(e, AgentStreamEvent::ToolResult { name, success, .. } if name == "calculator" && *success));
         let has_done = events.iter().any(|e| matches!(e, AgentStreamEvent::Done { tool_calls_made, .. } if *tool_calls_made == 1));
 

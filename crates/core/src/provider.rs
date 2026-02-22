@@ -5,10 +5,10 @@
 //!
 //! Implementations: OpenAI-compatible, Anthropic, Ollama, custom endpoints.
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use crate::error::ProviderError;
 use crate::message::{Message, MessageToolCall};
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 /// Configuration for a provider request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,7 +136,10 @@ pub trait Provider: Send + Sync {
     fn name(&self) -> &str;
 
     /// Send a request and get a complete response.
-    async fn complete(&self, request: ProviderRequest) -> std::result::Result<ProviderResponse, ProviderError>;
+    async fn complete(
+        &self,
+        request: ProviderRequest,
+    ) -> std::result::Result<ProviderResponse, ProviderError>;
 
     /// Send a request and get a stream of response chunks.
     ///
@@ -150,12 +153,14 @@ pub trait Provider: Send + Sync {
     > {
         let response = self.complete(request).await?;
         let (tx, rx) = tokio::sync::mpsc::channel(1);
-        let _ = tx.send(Ok(StreamChunk {
-            content: Some(response.message.content),
-            tool_calls: response.message.tool_calls,
-            done: true,
-            usage: response.usage,
-        })).await;
+        let _ = tx
+            .send(Ok(StreamChunk {
+                content: Some(response.message.content),
+                tool_calls: response.message.tool_calls,
+                done: true,
+                usage: response.usage,
+            }))
+            .await;
         Ok(rx)
     }
 
@@ -166,9 +171,10 @@ pub trait Provider: Send + Sync {
         &self,
         _request: EmbeddingRequest,
     ) -> std::result::Result<EmbeddingResponse, ProviderError> {
-        Err(ProviderError::NotConfigured(
-            format!("Provider '{}' does not support embeddings", self.name()),
-        ))
+        Err(ProviderError::NotConfigured(format!(
+            "Provider '{}' does not support embeddings",
+            self.name()
+        )))
     }
 
     /// List available models for this provider.

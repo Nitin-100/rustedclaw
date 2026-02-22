@@ -39,9 +39,7 @@ pub fn validate_path(
     // Check for obvious path traversal attempts
     let path_str = path.replace('\\', "/");
     if path_str.contains("../") || path_str.contains("/..") || path_str == ".." {
-        return Err(PathValidationError::PathTraversal {
-            path: path.into(),
-        });
+        return Err(PathValidationError::PathTraversal { path: path.into() });
     }
 
     // Check against forbidden paths
@@ -68,9 +66,7 @@ pub fn validate_path(
         });
 
         if !is_allowed {
-            return Err(PathValidationError::OutsideAllowedRoots {
-                path: path.into(),
-            });
+            return Err(PathValidationError::OutsideAllowedRoots { path: path.into() });
         }
     }
 
@@ -79,10 +75,10 @@ pub fn validate_path(
 
 /// Expand ~ to the user's home directory.
 fn expand_tilde(path: &str) -> String {
-    if path.starts_with("~/") || path == "~" {
-        if let Ok(home) = home_dir() {
-            return path.replacen('~', &home, 1);
-        }
+    if (path.starts_with("~/") || path == "~")
+        && let Ok(home) = home_dir()
+    {
+        return path.replacen('~', &home, 1);
     }
     path.to_string()
 }
@@ -140,18 +136,10 @@ mod tests {
     #[test]
     fn allowed_roots_enforced() {
         let allowed = vec!["/home/user/workspace".into()];
-        let result = validate_path(
-            "/home/user/workspace/src/main.rs",
-            &allowed,
-            &[],
-        );
+        let result = validate_path("/home/user/workspace/src/main.rs", &allowed, &[]);
         assert!(result.is_ok());
 
-        let result = validate_path(
-            "/home/other/secret.txt",
-            &allowed,
-            &[],
-        );
+        let result = validate_path("/home/other/secret.txt", &allowed, &[]);
         assert!(result.is_err());
         match result.unwrap_err() {
             PathValidationError::OutsideAllowedRoots { .. } => {}
@@ -188,10 +176,7 @@ mod tests {
 
     #[test]
     fn multiple_roots_any_match_allowed() {
-        let allowed = vec![
-            "/home/user/project1".into(),
-            "/home/user/project2".into(),
-        ];
+        let allowed = vec!["/home/user/project1".into(), "/home/user/project2".into()];
         assert!(validate_path("/home/user/project1/file.rs", &allowed, &[]).is_ok());
         assert!(validate_path("/home/user/project2/file.rs", &allowed, &[]).is_ok());
         assert!(validate_path("/home/user/project3/file.rs", &allowed, &[]).is_err());

@@ -4,9 +4,9 @@
 //! Slack, CLI, webhook, etc.). It receives messages from users and sends
 //! responses back.
 
+use crate::error::ChannelError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::error::ChannelError;
 
 /// Unique identifier for a channel instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

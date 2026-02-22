@@ -60,10 +60,7 @@ impl Tool for HttpRequestTool {
             .as_str()
             .ok_or_else(|| ToolError::InvalidArguments("Missing 'url' argument".into()))?;
 
-        let method = arguments["method"]
-            .as_str()
-            .unwrap_or("GET")
-            .to_uppercase();
+        let method = arguments["method"].as_str().unwrap_or("GET").to_uppercase();
 
         // Validate method
         if !matches!(method.as_str(), "GET" | "POST" | "PUT" | "PATCH" | "DELETE") {
@@ -135,12 +132,16 @@ fn generate_mock_response(
 
     if lower_url.contains("/api/") || lower_url.contains("/v1/") {
         let body = match method {
-            "GET" => r#"{"data":[{"id":1,"name":"Item 1"},{"id":2,"name":"Item 2"}],"total":2}"#.into(),
+            "GET" => {
+                r#"{"data":[{"id":1,"name":"Item 1"},{"id":2,"name":"Item 2"}],"total":2}"#.into()
+            }
             "POST" => {
                 let id = simple_hash(request_body.unwrap_or("")) % 10000;
                 format!(r#"{{"id":{id},"created":true,"message":"Resource created successfully"}}"#)
             }
-            "PUT" | "PATCH" => r#"{"updated":true,"message":"Resource updated successfully"}"#.into(),
+            "PUT" | "PATCH" => {
+                r#"{"updated":true,"message":"Resource updated successfully"}"#.into()
+            }
             "DELETE" => r#"{"deleted":true,"message":"Resource deleted successfully"}"#.into(),
             _ => r#"{"error":"Method not allowed"}"#.into(),
         };
@@ -197,7 +198,8 @@ fn status_text_for(code: u16) -> &'static str {
 }
 
 fn simple_hash(s: &str) -> u64 {
-    s.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
+    s.bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
 }
 
 #[cfg(test)]

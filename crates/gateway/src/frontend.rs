@@ -4,10 +4,10 @@
 //! using `include_str!`, enabling single-binary deployment.
 
 use axum::{
-    http::{header, StatusCode},
+    Router,
+    http::{StatusCode, header},
     response::{Html, IntoResponse, Response},
     routing::get,
-    Router,
 };
 
 /// The embedded frontend files.
@@ -39,7 +39,10 @@ async fn css_handler() -> Response {
 async fn js_handler() -> Response {
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "application/javascript; charset=utf-8")],
+        [(
+            header::CONTENT_TYPE,
+            "application/javascript; charset=utf-8",
+        )],
         APP_JS,
     )
         .into_response()
@@ -57,17 +60,17 @@ mod tests {
     async fn serves_index_html() {
         let app = frontend_router();
 
-        let req = Request::builder()
-            .uri("/")
-            .body(Body::empty())
-            .unwrap();
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
 
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let text = String::from_utf8_lossy(&body);
-        assert!(text.contains("RustedClaw"), "Index HTML should contain 'RustedClaw'");
+        assert!(
+            text.contains("RustedClaw"),
+            "Index HTML should contain 'RustedClaw'"
+        );
         assert!(text.contains("<!DOCTYPE html>"), "Should be valid HTML");
     }
 

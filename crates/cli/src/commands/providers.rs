@@ -38,7 +38,5 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn provider_list_compiles() {
-        assert!(true);
-    }
+    fn provider_list_compiles() {}
 }

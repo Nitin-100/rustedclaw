@@ -198,10 +198,7 @@ impl ContextAssembler {
     /// 3. Fill remaining budget in priority order:
     ///    Long-Term Memory → Working Memory → Knowledge/RAG → Tool Schemas → Conversation History
     /// 4. Return assembled context + metadata
-    pub fn assemble(
-        &self,
-        input: &AssemblyInput<'_>,
-    ) -> Result<AssembledContext, AssemblyError> {
+    pub fn assemble(&self, input: &AssemblyInput<'_>) -> Result<AssembledContext, AssemblyError> {
         let mut stats: Vec<LayerStats> = Vec::new();
         let mut drops: Vec<DropInfo> = Vec::new();
 
@@ -232,11 +229,10 @@ impl ContextAssembler {
         let mut context_sections: Vec<String> = Vec::new();
 
         // ── Layer 2: Long-Term Memory ──────────────────────────────────────
-        let (mem_section, mem_stats, mem_drop) =
-            Self::render_memory_layer(
-                input.memories,
-                self.effective_budget(self.budget.per_layer.long_term_memory, remaining),
-            );
+        let (mem_section, mem_stats, mem_drop) = Self::render_memory_layer(
+            input.memories,
+            self.effective_budget(self.budget.per_layer.long_term_memory, remaining),
+        );
         remaining -= mem_stats.tokens;
         if !mem_section.is_empty() {
             context_sections.push(mem_section);
@@ -247,11 +243,10 @@ impl ContextAssembler {
         }
 
         // ── Layer 3: Working Memory ────────────────────────────────────────
-        let (wm_section, wm_stats, wm_drop) =
-            Self::render_working_memory_layer(
-                input.working_memory,
-                self.effective_budget(self.budget.per_layer.working_memory, remaining),
-            );
+        let (wm_section, wm_stats, wm_drop) = Self::render_working_memory_layer(
+            input.working_memory,
+            self.effective_budget(self.budget.per_layer.working_memory, remaining),
+        );
         remaining -= wm_stats.tokens;
         if !wm_section.is_empty() {
             context_sections.push(wm_section);
@@ -262,11 +257,10 @@ impl ContextAssembler {
         }
 
         // ── Layer 4: Knowledge / RAG ───────────────────────────────────────
-        let (rag_section, rag_stats, rag_drop) =
-            Self::render_knowledge_layer(
-                input.knowledge_chunks,
-                self.effective_budget(self.budget.per_layer.knowledge, remaining),
-            );
+        let (rag_section, rag_stats, rag_drop) = Self::render_knowledge_layer(
+            input.knowledge_chunks,
+            self.effective_budget(self.budget.per_layer.knowledge, remaining),
+        );
         remaining -= rag_stats.tokens;
         if !rag_section.is_empty() {
             context_sections.push(rag_section);
@@ -277,11 +271,10 @@ impl ContextAssembler {
         }
 
         // ── Layer 5: Tool Schemas ──────────────────────────────────────────
-        let (tools_included, tool_stats, tool_drop) =
-            Self::render_tool_layer(
-                input.tool_definitions,
-                self.effective_budget(self.budget.per_layer.tool_schemas, remaining),
-            );
+        let (tools_included, tool_stats, tool_drop) = Self::render_tool_layer(
+            input.tool_definitions,
+            self.effective_budget(self.budget.per_layer.tool_schemas, remaining),
+        );
         remaining -= tool_stats.tokens;
         stats.push(tool_stats);
         if let Some(d) = tool_drop {
@@ -289,11 +282,10 @@ impl ContextAssembler {
         }
 
         // ── Layer 6: Conversation History ──────────────────────────────────
-        let (history_messages, hist_stats, hist_drop) =
-            Self::render_history_layer(
-                input.conversation,
-                self.effective_budget(self.budget.per_layer.conversation_history, remaining),
-            );
+        let (history_messages, hist_stats, hist_drop) = Self::render_history_layer(
+            input.conversation,
+            self.effective_budget(self.budget.per_layer.conversation_history, remaining),
+        );
         // remaining -= hist_stats.tokens; // last layer, not needed
         stats.push(hist_stats);
         if let Some(d) = hist_drop {
@@ -587,7 +579,12 @@ impl ContextAssembler {
                 items_included: tools.len() - dropped,
                 items_total: tools.len(),
             },
-            Self::maybe_drop(layer, dropped, dropped_tokens, "Least-relevant tools dropped"),
+            Self::maybe_drop(
+                layer,
+                dropped,
+                dropped_tokens,
+                "Least-relevant tools dropped",
+            ),
         )
     }
 
@@ -634,7 +631,12 @@ impl ContextAssembler {
                 items_included: included_count,
                 items_total: messages.len(),
             },
-            Self::maybe_drop(layer, dropped, dropped_tokens, "Oldest turns dropped (sliding window)"),
+            Self::maybe_drop(
+                layer,
+                dropped,
+                dropped_tokens,
+                "Oldest turns dropped (sliding window)",
+            ),
         )
     }
 
@@ -656,12 +658,7 @@ impl ContextAssembler {
         }
     }
 
-    fn maybe_drop(
-        layer: &str,
-        count: usize,
-        tokens: usize,
-        reason: &str,
-    ) -> Option<DropInfo> {
+    fn maybe_drop(layer: &str, count: usize, tokens: usize, reason: &str) -> Option<DropInfo> {
         if count > 0 {
             Some(DropInfo {
                 layer: layer.into(),
@@ -747,7 +744,12 @@ mod tests {
         let result = asm.assemble(&default_input(&id, &wm, &conv)).unwrap();
         assert!(!result.system_message.is_empty());
 
-        let sys_layer = result.metadata.per_layer.iter().find(|l| l.name == "system").unwrap();
+        let sys_layer = result
+            .metadata
+            .per_layer
+            .iter()
+            .find(|l| l.name == "system")
+            .unwrap();
         assert!(sys_layer.tokens > 0);
         assert_eq!(sys_layer.items_included, 1);
     }
@@ -805,7 +807,12 @@ mod tests {
         assert!(result.system_message.contains("metric units"));
         assert!(result.system_message.contains("Alice"));
 
-        let mem_layer = result.metadata.per_layer.iter().find(|l| l.name == "long_term_memory").unwrap();
+        let mem_layer = result
+            .metadata
+            .per_layer
+            .iter()
+            .find(|l| l.name == "long_term_memory")
+            .unwrap();
         assert_eq!(mem_layer.items_included, 2);
     }
 
@@ -880,7 +887,12 @@ mod tests {
         let result = asm.assemble(&input).unwrap();
         assert_eq!(result.tool_definitions.len(), 2);
 
-        let tool_layer = result.metadata.per_layer.iter().find(|l| l.name == "tool_schemas").unwrap();
+        let tool_layer = result
+            .metadata
+            .per_layer
+            .iter()
+            .find(|l| l.name == "tool_schemas")
+            .unwrap();
         assert_eq!(tool_layer.items_included, 2);
     }
 
@@ -899,8 +911,8 @@ mod tests {
 
         // Add many messages — some should be dropped due to budget
         for i in 0..20 {
-            conv.push(Message::user(&format!("Message number {}", i)));
-            conv.push(Message::assistant(&format!("Response to message {}", i)));
+            conv.push(Message::user(format!("Message number {}", i)));
+            conv.push(Message::assistant(format!("Response to message {}", i)));
         }
 
         let input = AssemblyInput {
@@ -920,11 +932,22 @@ mod tests {
         assert!(result.messages.len() < 41);
 
         // The last non-user message in history should be recent, not old
-        let hist_layer = result.metadata.per_layer.iter().find(|l| l.name == "conversation_history").unwrap();
+        let hist_layer = result
+            .metadata
+            .per_layer
+            .iter()
+            .find(|l| l.name == "conversation_history")
+            .unwrap();
         assert!(hist_layer.items_included < hist_layer.items_total);
 
         // Should have a drop record
-        assert!(result.metadata.drops.iter().any(|d| d.layer == "conversation_history"));
+        assert!(
+            result
+                .metadata
+                .drops
+                .iter()
+                .any(|d| d.layer == "conversation_history")
+        );
     }
 
     #[test]
@@ -997,12 +1020,23 @@ mod tests {
         };
 
         let result = asm.assemble(&input).unwrap();
-        let mem_layer = result.metadata.per_layer.iter().find(|l| l.name == "long_term_memory").unwrap();
+        let mem_layer = result
+            .metadata
+            .per_layer
+            .iter()
+            .find(|l| l.name == "long_term_memory")
+            .unwrap();
 
         // Should not have included all 10 memories
         assert!(mem_layer.items_included < 10);
         // Should have a drop record
-        assert!(result.metadata.drops.iter().any(|d| d.layer == "long_term_memory"));
+        assert!(
+            result
+                .metadata
+                .drops
+                .iter()
+                .any(|d| d.layer == "long_term_memory")
+        );
     }
 
     #[test]
@@ -1032,8 +1066,16 @@ mod tests {
         // Same token counts
         assert_eq!(result1.metadata.total_tokens, result2.metadata.total_tokens);
         // Same layer stats
-        assert_eq!(result1.metadata.per_layer.len(), result2.metadata.per_layer.len());
-        for (a, b) in result1.metadata.per_layer.iter().zip(result2.metadata.per_layer.iter()) {
+        assert_eq!(
+            result1.metadata.per_layer.len(),
+            result2.metadata.per_layer.len()
+        );
+        for (a, b) in result1
+            .metadata
+            .per_layer
+            .iter()
+            .zip(result2.metadata.per_layer.iter())
+        {
             assert_eq!(a.name, b.name);
             assert_eq!(a.tokens, b.tokens);
             assert_eq!(a.items_included, b.items_included);
@@ -1060,7 +1102,7 @@ mod tests {
 
         let mut conv = Conversation::new();
         for i in 0..10 {
-            conv.push(Message::user(&format!("Old message {}", i)));
+            conv.push(Message::user(format!("Old message {}", i)));
         }
 
         let memories = vec![test_memory("Critical fact")];
@@ -1079,12 +1121,28 @@ mod tests {
         let result = asm.assemble(&input).unwrap();
 
         // Memory (Layer 2, higher priority) should be included
-        let mem = result.metadata.per_layer.iter().find(|l| l.name == "long_term_memory").unwrap();
-        assert!(mem.items_included > 0, "Memory should be included (high priority)");
+        let mem = result
+            .metadata
+            .per_layer
+            .iter()
+            .find(|l| l.name == "long_term_memory")
+            .unwrap();
+        assert!(
+            mem.items_included > 0,
+            "Memory should be included (high priority)"
+        );
 
         // Conversation history (Layer 6, lowest priority) should be most starved
-        let hist = result.metadata.per_layer.iter().find(|l| l.name == "conversation_history").unwrap();
-        assert!(hist.items_included < hist.items_total, "History should be trimmed (low priority)");
+        let hist = result
+            .metadata
+            .per_layer
+            .iter()
+            .find(|l| l.name == "conversation_history")
+            .unwrap();
+        assert!(
+            hist.items_included < hist.items_total,
+            "History should be trimmed (low priority)"
+        );
     }
 
     #[test]
@@ -1127,6 +1185,6 @@ mod tests {
 
         // No drops with generous budget
         assert!(result.metadata.drops.is_empty());
-        assert_eq!(result.metadata.utilization_pct.is_finite(), true);
+        assert!(result.metadata.utilization_pct.is_finite());
     }
 }

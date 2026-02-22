@@ -3,12 +3,22 @@
 use tracing::info;
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let config = rustedclaw_config::AppConfig::load()
-        .map_err(|e| format!("Failed to load config: {e}"))?;
+    let config =
+        rustedclaw_config::AppConfig::load().map_err(|e| format!("Failed to load config: {e}"))?;
 
     println!("🦀 RustedClaw Daemon — Starting full runtime");
-    println!("   Gateway: {}:{}", config.gateway.host, config.gateway.port);
-    println!("   Heartbeat: {}", if config.heartbeat.enabled { "enabled" } else { "disabled" });
+    println!(
+        "   Gateway: {}:{}",
+        config.gateway.host, config.gateway.port
+    );
+    println!(
+        "   Heartbeat: {}",
+        if config.heartbeat.enabled {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
     println!("   Routines: {}", config.routines.len());
 
     // Start workflow engine
@@ -24,7 +34,11 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             tracing::warn!("Routine load error: {err}");
         }
         let loaded = config.routines.len() - errors.len();
-        info!(loaded, total = config.routines.len(), "Routines loaded from config");
+        info!(
+            loaded,
+            total = config.routines.len(),
+            "Routines loaded from config"
+        );
     }
 
     let (mut task_rx, _workflow_handle) = workflow.start();

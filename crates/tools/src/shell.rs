@@ -25,11 +25,7 @@ impl ShellTool {
         }
 
         // Extract the base command (first word)
-        let base_cmd = command
-            .split_whitespace()
-            .next()
-            .unwrap_or("")
-            .trim();
+        let base_cmd = command.split_whitespace().next().unwrap_or("").trim();
 
         self.allowed_commands.iter().any(|a| a == base_cmd)
     }
@@ -37,7 +33,9 @@ impl ShellTool {
 
 #[async_trait]
 impl Tool for ShellTool {
-    fn name(&self) -> &str { "shell" }
+    fn name(&self) -> &str {
+        "shell"
+    }
 
     fn description(&self) -> &str {
         "Execute a shell command and return stdout/stderr. Use this for running programs, checking files, git operations, etc."
@@ -64,22 +62,19 @@ impl Tool for ShellTool {
         if !self.is_command_allowed(command) {
             return Err(ToolError::PermissionDenied {
                 tool_name: "shell".into(),
-                reason: format!("Command '{}' not in allowlist", command.split_whitespace().next().unwrap_or("")),
+                reason: format!(
+                    "Command '{}' not in allowlist",
+                    command.split_whitespace().next().unwrap_or("")
+                ),
             });
         }
 
         debug!(command = %command, "Executing shell command");
 
         let output = if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .args(["/C", command])
-                .output()
-                .await
+            Command::new("cmd").args(["/C", command]).output().await
         } else {
-            Command::new("sh")
-                .args(["-c", command])
-                .output()
-                .await
+            Command::new("sh").args(["-c", command]).output().await
         };
 
         match output {

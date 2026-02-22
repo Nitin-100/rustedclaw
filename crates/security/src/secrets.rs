@@ -74,7 +74,8 @@ fn derive_key(password: &str) -> Vec<u8> {
     for (i, &b) in bytes.iter().enumerate() {
         key[i % 32] ^= b;
         // Mix with position to avoid collisions
-        key[(i + 13) % 32] = key[(i + 13) % 32].wrapping_add(b.wrapping_mul((i as u8).wrapping_add(1)));
+        key[(i + 13) % 32] =
+            key[(i + 13) % 32].wrapping_add(b.wrapping_mul((i as u8).wrapping_add(1)));
     }
 
     // Additional mixing rounds for better distribution
@@ -176,10 +177,10 @@ mod tests {
         let result = manager2.decrypt(&encrypted);
 
         // Should decrypt but to wrong value (XOR-based cipher doesn't fail on wrong key)
-        match result {
-            Ok(val) => assert_ne!(val, "my-api-key"),
-            Err(_) => {} // UTF-8 decode error is also valid
+        if let Ok(val) = result {
+            assert_ne!(val, "my-api-key");
         }
+        // Err case (UTF-8 decode error) is also valid
     }
 
     #[test]

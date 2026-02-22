@@ -108,7 +108,9 @@ mod tests {
 
         let event = rx.recv().await.unwrap();
         match event.as_ref() {
-            DomainEvent::ToolExecuted { tool_name, success, .. } => {
+            DomainEvent::ToolExecuted {
+                tool_name, success, ..
+            } => {
                 assert_eq!(tool_name, "shell");
                 assert!(success);
             }

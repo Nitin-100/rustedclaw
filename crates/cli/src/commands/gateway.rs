@@ -2,7 +2,10 @@
 
 use rustedclaw_config::AppConfig;
 
-pub async fn run(port_override: Option<u16>, host_override: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(
+    port_override: Option<u16>,
+    host_override: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::load().map_err(|e| format!("Failed to load config: {e}"))?;
 
     if let Some(port) = port_override {
@@ -13,7 +16,10 @@ pub async fn run(port_override: Option<u16>, host_override: Option<String>) -> R
     }
 
     println!("🦀 RustedClaw Gateway");
-    println!("   Listening: {}:{}", config.gateway.host, config.gateway.port);
+    println!(
+        "   Listening: {}:{}",
+        config.gateway.host, config.gateway.port
+    );
     println!("   Pairing required: {}", config.gateway.require_pairing);
 
     rustedclaw_gateway::start(config).await?;

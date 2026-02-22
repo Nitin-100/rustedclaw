@@ -110,7 +110,8 @@ impl Identity {
             "You have access to tools that let you interact with the user's system. ",
             "Use them when appropriate to help the user accomplish their goals. ",
             "Be concise, accurate, and proactive.",
-        ).into()
+        )
+        .into()
     }
 
     /// Load identity from context files following the layered hierarchy.
@@ -135,36 +136,49 @@ impl Identity {
         // Layer 1: Global identity files from ~/.rustedclaw/workspace/
         if let Some(global_dir) = &paths.global_dir {
             Self::try_load_section(
-                global_dir, IDENTITY_FILE, "Identity",
-                &mut sections, &mut loaded_files,
+                global_dir,
+                IDENTITY_FILE,
+                "Identity",
+                &mut sections,
+                &mut loaded_files,
             );
             Self::try_load_section(
-                global_dir, SOUL_FILE, "Personality & Tone",
-                &mut sections, &mut loaded_files,
+                global_dir,
+                SOUL_FILE,
+                "Personality & Tone",
+                &mut sections,
+                &mut loaded_files,
             );
             Self::try_load_section(
-                global_dir, USER_FILE, "User Context",
-                &mut sections, &mut loaded_files,
+                global_dir,
+                USER_FILE,
+                "User Context",
+                &mut sections,
+                &mut loaded_files,
             );
         }
 
         // Layer 2: Project-local context from ./.rustedclaw/
         if let Some(project_dir) = &paths.project_dir {
             Self::try_load_section(
-                project_dir, AGENTS_FILE, "Project Agent Instructions",
-                &mut sections, &mut loaded_files,
+                project_dir,
+                AGENTS_FILE,
+                "Project Agent Instructions",
+                &mut sections,
+                &mut loaded_files,
             );
             Self::try_load_section(
-                project_dir, RULES_FILE, "Project Rules & Constraints",
-                &mut sections, &mut loaded_files,
+                project_dir,
+                RULES_FILE,
+                "Project Rules & Constraints",
+                &mut sections,
+                &mut loaded_files,
             );
 
             // Also check for any .md files in .rustedclaw/context/ subdirectory
             let context_subdir = project_dir.join("context");
             if context_subdir.is_dir() {
-                Self::load_context_directory(
-                    &context_subdir, &mut sections, &mut loaded_files,
-                );
+                Self::load_context_directory(&context_subdir, &mut sections, &mut loaded_files);
             }
         }
 
@@ -229,16 +243,14 @@ impl Identity {
         loaded_files: &mut Vec<String>,
     ) {
         let path = dir.join(filename);
-        if let Some(content) = Self::read_file_safe(&path) {
-            if !content.trim().is_empty() {
-                debug!(file = %path.display(), "Loaded context file");
-                loaded_files.push(path.display().to_string());
-                sections.push(ContextSection {
-                    source: path.display().to_string(),
-                    heading: heading.to_string(),
-                    content,
-                });
-            }
+        if let Some(content) = Self::read_file_safe(&path).filter(|c| !c.trim().is_empty()) {
+            debug!(file = %path.display(), "Loaded context file");
+            loaded_files.push(path.display().to_string());
+            sections.push(ContextSection {
+                source: path.display().to_string(),
+                heading: heading.to_string(),
+                content,
+            });
         }
     }
 
@@ -268,31 +280,26 @@ impl Identity {
         entries.sort();
 
         for path in entries {
-            if let Some(content) = Self::read_file_safe(&path) {
-                if !content.trim().is_empty() {
-                    let filename = path
-                        .file_stem()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("context");
-                    let heading = format!("Context: {}", filename);
-                    debug!(file = %path.display(), "Loaded extra context file");
-                    loaded_files.push(path.display().to_string());
-                    sections.push(ContextSection {
-                        source: path.display().to_string(),
-                        heading,
-                        content,
-                    });
-                }
+            if let Some(content) = Self::read_file_safe(&path).filter(|c| !c.trim().is_empty()) {
+                let filename = path
+                    .file_stem()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("context");
+                let heading = format!("Context: {}", filename);
+                debug!(file = %path.display(), "Loaded extra context file");
+                loaded_files.push(path.display().to_string());
+                sections.push(ContextSection {
+                    source: path.display().to_string(),
+                    heading,
+                    content,
+                });
             }
         }
     }
 
     /// Safely read a file, returning None on any error.
     fn read_file_safe(path: &Path) -> Option<String> {
-        match std::fs::read_to_string(path) {
-            Ok(content) => Some(content),
-            Err(_) => None,
-        }
+        std::fs::read_to_string(path).ok()
     }
 
     /// Assemble a system prompt from loaded sections.
@@ -321,9 +328,7 @@ impl Identity {
                 .heading
                 .to_lowercase()
                 .replace(' ', "_")
-                .replace(':', "")
-                .replace('(', "")
-                .replace(')', "");
+                .replace([':', '(', ')'], "");
 
             prompt.push_str(&format!("<{}>\n", tag));
             prompt.push_str(section.content.trim());
@@ -440,7 +445,11 @@ mod tests {
         let dir = tmp.path();
 
         // Create test context files
-        fs::write(dir.join("IDENTITY.md"), "# MyAgent\n\nYou are MyAgent, a coding assistant.").unwrap();
+        fs::write(
+            dir.join("IDENTITY.md"),
+            "# MyAgent\n\nYou are MyAgent, a coding assistant.",
+        )
+        .unwrap();
         fs::write(dir.join("SOUL.md"), "Be friendly and thorough.").unwrap();
 
         let paths = ContextPaths {
@@ -465,17 +474,20 @@ mod tests {
         fs::write(
             tmp_global.path().join("IDENTITY.md"),
             "You are TestBot, a general assistant.",
-        ).unwrap();
+        )
+        .unwrap();
 
         fs::write(
             tmp_project.path().join("AGENTS.md"),
             "This is a Rust project. Prefer idiomatic Rust patterns.",
-        ).unwrap();
+        )
+        .unwrap();
 
         fs::write(
             tmp_project.path().join("RULES.md"),
             "Never use unwrap() in production code.\nAlways handle errors with Result.",
-        ).unwrap();
+        )
+        .unwrap();
 
         let paths = ContextPaths {
             global_dir: Some(tmp_global.path().to_path_buf()),
@@ -497,8 +509,16 @@ mod tests {
         fs::create_dir_all(&context_dir).unwrap();
 
         fs::write(context_dir.join("01-api-docs.md"), "API endpoint: /v1/chat").unwrap();
-        fs::write(context_dir.join("02-schema.md"), "User table has id, name, email").unwrap();
-        fs::write(context_dir.join("readme.txt"), "This is a text file context").unwrap();
+        fs::write(
+            context_dir.join("02-schema.md"),
+            "User table has id, name, email",
+        )
+        .unwrap();
+        fs::write(
+            context_dir.join("readme.txt"),
+            "This is a text file context",
+        )
+        .unwrap();
         fs::write(context_dir.join("ignore.json"), "this should be ignored").unwrap();
 
         let paths = ContextPaths {

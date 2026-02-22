@@ -2,11 +2,11 @@
 //!
 //! Handles provider creation, caching, and routing requests to the right backend.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use rustedclaw_core::provider::Provider;
 use crate::anthropic::AnthropicProvider;
 use crate::openai_compat::OpenAiCompatProvider;
+use rustedclaw_core::provider::Provider;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Routes LLM requests to the correct provider.
 pub struct ProviderRouter {
@@ -44,9 +44,7 @@ impl ProviderRouter {
         if let Some(rest) = model_or_provider.strip_prefix("custom:") {
             // Create an ad-hoc custom provider
             let provider = Arc::new(OpenAiCompatProvider::new(
-                "custom",
-                rest,
-                "", // API key from env or config
+                "custom", rest, "", // API key from env or config
             ));
             return Some((provider, model_or_provider.to_string()));
         }
@@ -62,9 +60,7 @@ impl ProviderRouter {
 }
 
 /// Build providers from configuration.
-pub fn build_from_config(
-    config: &rustedclaw_config::AppConfig,
-) -> ProviderRouter {
+pub fn build_from_config(config: &rustedclaw_config::AppConfig) -> ProviderRouter {
     let mut router = ProviderRouter::new(&config.default_provider);
 
     // Build providers from config

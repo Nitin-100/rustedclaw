@@ -97,7 +97,7 @@ impl CronExpr {
     ///
     /// Supports: `*`, `*/N` (step), `N` (literal), `N-M` (range), `N,M` (list).
     fn parse(expr: &str) -> Result<Self, String> {
-        let fields: Vec<&str> = expr.trim().split_whitespace().collect();
+        let fields: Vec<&str> = expr.split_whitespace().collect();
         if fields.len() != 5 {
             return Err(format!(
                 "Expected 5 fields (minute hour dom month dow), got {}",
@@ -334,7 +334,11 @@ impl WorkflowEngine {
                             if let Some(task) = map.get_mut(&task_id) {
                                 task.last_run = Some(now);
                                 info!(task_id = %task_id, name = %task.name, "Cron task triggered");
-                                (task.instruction.clone(), task.target_channel.clone(), task.action.clone())
+                                (
+                                    task.instruction.clone(),
+                                    task.target_channel.clone(),
+                                    task.action.clone(),
+                                )
                             } else {
                                 continue;
                             }
@@ -374,10 +378,12 @@ impl CronTask {
     /// Create a CronTask from a config routine.
     pub fn from_routine_config(config: &rustedclaw_config::RoutineConfig) -> Self {
         let action = match &config.action {
-            rustedclaw_config::RoutineAction::AgentTask { prompt, context } => TaskAction::AgentTask {
-                prompt: prompt.clone(),
-                context: context.clone(),
-            },
+            rustedclaw_config::RoutineAction::AgentTask { prompt, context } => {
+                TaskAction::AgentTask {
+                    prompt: prompt.clone(),
+                    context: context.clone(),
+                }
+            }
             rustedclaw_config::RoutineAction::RunTool { tool, input } => TaskAction::RunTool {
                 tool: tool.clone(),
                 input: input.clone(),
@@ -417,7 +423,10 @@ impl CronTask {
 
 impl WorkflowEngine {
     /// Load routines from the application config.
-    pub async fn load_routines(&self, routines: &[rustedclaw_config::RoutineConfig]) -> Vec<String> {
+    pub async fn load_routines(
+        &self,
+        routines: &[rustedclaw_config::RoutineConfig],
+    ) -> Vec<String> {
         let mut errors = Vec::new();
         for routine in routines {
             let task = CronTask::from_routine_config(routine);
@@ -437,17 +446,20 @@ mod tests {
     async fn add_and_list_tasks() {
         let engine = WorkflowEngine::default();
 
-        engine.add_task(CronTask {
-            id: "task_1".into(),
-            name: "Check email".into(),
-            instruction: "Check for new emails and summarize them".into(),
-            schedule: "*/30 * * * *".into(),
-            enabled: true,
-            target_channel: None,
-            action: TaskAction::default(),
-            last_run: None,
-            next_run: None,
-        }).await.unwrap();
+        engine
+            .add_task(CronTask {
+                id: "task_1".into(),
+                name: "Check email".into(),
+                instruction: "Check for new emails and summarize them".into(),
+                schedule: "*/30 * * * *".into(),
+                enabled: true,
+                target_channel: None,
+                action: TaskAction::default(),
+                last_run: None,
+                next_run: None,
+            })
+            .await
+            .unwrap();
 
         let tasks = engine.list_tasks().await;
         assert_eq!(tasks.len(), 1);
@@ -458,17 +470,20 @@ mod tests {
     async fn pause_and_resume() {
         let engine = WorkflowEngine::default();
 
-        engine.add_task(CronTask {
-            id: "t1".into(),
-            name: "Test".into(),
-            instruction: "Do something".into(),
-            schedule: "* * * * *".into(),
-            enabled: true,
-            target_channel: None,
-            action: TaskAction::default(),
-            last_run: None,
-            next_run: None,
-        }).await.unwrap();
+        engine
+            .add_task(CronTask {
+                id: "t1".into(),
+                name: "Test".into(),
+                instruction: "Do something".into(),
+                schedule: "* * * * *".into(),
+                enabled: true,
+                target_channel: None,
+                action: TaskAction::default(),
+                last_run: None,
+                next_run: None,
+            })
+            .await
+            .unwrap();
 
         assert!(engine.pause_task("t1").await);
         let tasks = engine.list_tasks().await;
@@ -483,17 +498,20 @@ mod tests {
     async fn remove_task() {
         let engine = WorkflowEngine::default();
 
-        engine.add_task(CronTask {
-            id: "t1".into(),
-            name: "Test".into(),
-            instruction: "Test".into(),
-            schedule: "* * * * *".into(),
-            enabled: true,
-            target_channel: None,
-            action: TaskAction::default(),
-            last_run: None,
-            next_run: None,
-        }).await.unwrap();
+        engine
+            .add_task(CronTask {
+                id: "t1".into(),
+                name: "Test".into(),
+                instruction: "Test".into(),
+                schedule: "* * * * *".into(),
+                enabled: true,
+                target_channel: None,
+                action: TaskAction::default(),
+                last_run: None,
+                next_run: None,
+            })
+            .await
+            .unwrap();
 
         assert!(engine.remove_task("t1").await);
         assert!(!engine.remove_task("t1").await); // Already removed
@@ -504,17 +522,19 @@ mod tests {
     async fn invalid_cron_rejected() {
         let engine = WorkflowEngine::default();
 
-        let result = engine.add_task(CronTask {
-            id: "bad".into(),
-            name: "Bad".into(),
-            instruction: "Won't work".into(),
-            schedule: "not a cron".into(),
-            enabled: true,
-            target_channel: None,
-            action: TaskAction::default(),
-            last_run: None,
-            next_run: None,
-        }).await;
+        let result = engine
+            .add_task(CronTask {
+                id: "bad".into(),
+                name: "Bad".into(),
+                instruction: "Won't work".into(),
+                schedule: "not a cron".into(),
+                enabled: true,
+                target_channel: None,
+                action: TaskAction::default(),
+                last_run: None,
+                next_run: None,
+            })
+            .await;
 
         assert!(result.is_err());
     }

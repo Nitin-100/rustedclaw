@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main, ci/benchmarks]
+  pull_request:
+    branches: [master, main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test --release
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustedclaw-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            target/release/rustedclaw
+            target/release/rustedclaw.exe
+          if-no-files-found: ignore
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t rustedclaw:ci .
+      - name: Check image size
+        run: |
+          SIZE=$(docker image inspect rustedclaw:ci --format='{{.Size}}')
+          SIZE_MB=$((SIZE / 1048576))
+          echo "## Docker Image: ${SIZE_MB} MB" >> $GITHUB_STEP_SUMMARY
+      - name: Smoke test
+        run: |
+          docker run -d --name smoke -p 42617:42617 \
+            -e OPENAI_API_KEY=sk-ci-placeholder rustedclaw:ci
+          sleep 2
+          curl -sf http://localhost:42617/health | jq .
+          docker rm -f smoke

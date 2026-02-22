@@ -15,13 +15,12 @@
 //! | 5. Tool Schemas | Tool registry | Least-relevant dropped |
 //! | 6. Conversation History | Recent turns | Oldest turns dropped |
 
+pub mod assembler;
 pub mod token;
 pub mod working_memory;
-pub mod assembler;
 
 pub use assembler::{
-    AssembledContext, AssemblyError, AssemblyInput, AssemblyMetadata,
-    ContextAssembler, DropInfo, KnowledgeChunk, LayerStats,
-    PerLayerBudget, TokenBudget,
+    AssembledContext, AssemblyError, AssemblyInput, AssemblyMetadata, ContextAssembler, DropInfo,
+    KnowledgeChunk, LayerStats, PerLayerBudget, TokenBudget,
 };
 pub use working_memory::WorkingMemory;

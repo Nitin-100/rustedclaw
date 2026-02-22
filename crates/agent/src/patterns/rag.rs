@@ -12,13 +12,13 @@
 //! 4. Generate response grounded in retrieved knowledge
 //! 5. Return answer with source attributions
 
-use std::sync::Arc;
 use rustedclaw_core::event::EventBus;
 use rustedclaw_core::identity::Identity;
 use rustedclaw_core::memory::MemoryEntry;
 use rustedclaw_core::message::{Conversation, Message};
 use rustedclaw_core::provider::{Provider, ProviderRequest};
 use rustedclaw_core::tool::ToolRegistry;
+use std::sync::Arc;
 use tracing::{debug, info};
 
 use crate::context::assembler::{AssemblyMetadata, KnowledgeChunk};
@@ -40,6 +40,7 @@ pub struct RagAgent {
     /// Token budget.
     budget: TokenBudget,
     /// Event bus.
+    #[allow(dead_code)]
     event_bus: Arc<EventBus>,
 }
 
@@ -132,9 +133,11 @@ impl RagAgent {
             user_message,
         };
 
-        let assembled = assembler.assemble(&input).map_err(|e| {
-            rustedclaw_core::Error::Config { message: format!("Context assembly failed: {}", e) }
-        })?;
+        let assembled = assembler
+            .assemble(&input)
+            .map_err(|e| rustedclaw_core::Error::Config {
+                message: format!("Context assembly failed: {}", e),
+            })?;
 
         let metadata = assembled.metadata.clone();
 
@@ -156,10 +159,7 @@ impl RagAgent {
         let answer = response.message.content.clone();
         conversation.push(response.message);
 
-        wm.add_reflection(&format!(
-            "Generated answer using {} sources",
-            chunks.len()
-        ));
+        wm.add_reflection(&format!("Generated answer using {} sources", chunks.len()));
 
         info!(
             chunks = chunks.len(),
@@ -195,26 +195,16 @@ impl RagAgent {
         })?;
 
         // Parse the tool output into KnowledgeChunks.
-        let raw: Vec<serde_json::Value> =
-            serde_json::from_str(&result.output).unwrap_or_default();
+        let raw: Vec<serde_json::Value> = serde_json::from_str(&result.output).unwrap_or_default();
 
         let chunks: Vec<KnowledgeChunk> = raw
             .into_iter()
             .enumerate()
             .map(|(i, v)| KnowledgeChunk {
-                document_id: v["document_id"]
-                    .as_str()
-                    .unwrap_or("unknown")
-                    .to_string(),
+                document_id: v["document_id"].as_str().unwrap_or("unknown").to_string(),
                 chunk_index: v["chunk_index"].as_u64().unwrap_or(i as u64) as usize,
-                content: v["content"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string(),
-                source: v["source"]
-                    .as_str()
-                    .unwrap_or("unknown")
-                    .to_string(),
+                content: v["content"].as_str().unwrap_or("").to_string(),
+                source: v["source"].as_str().unwrap_or("unknown").to_string(),
                 similarity: v["similarity"].as_f64().unwrap_or(0.0) as f32,
             })
             .collect();
