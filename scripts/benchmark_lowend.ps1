@@ -1,8 +1,8 @@
 $ErrorActionPreference = 'Continue'
 $IMAGE = 'rustedclaw-bench'
 $PORT_BASE = 42700
-$BINARY = 'c:\Users\DESKTOP\Desktop\Newwork\openclaw\target\release\rustedclaw.exe'
-$PROJ = 'c:\Users\DESKTOP\Desktop\Newwork\openclaw'
+$PROJ = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$BINARY = Join-Path $PROJ 'target\release\rustedclaw.exe'
 
 Write-Host ''
 Write-Host '======================================================================' -ForegroundColor Cyan

@@ -19,7 +19,7 @@ services:
       - RUSTEDCLAW_MODEL=${RUSTEDCLAW_MODEL:-gpt-4o-mini}
     volumes:
       - rustedclaw-data:/home/rustedclaw/.rustedclaw
-    mem_limit: 32m       # yes, 32 MB is generous — it idles at 6.5 MB
+    mem_limit: 32m       # yes, 32 MB is generous — it idles at ~1 MB
     cpus: 0.5
 
 volumes:

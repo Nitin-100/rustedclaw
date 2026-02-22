@@ -19,7 +19,7 @@ use rustedclaw_core::event::{DomainEvent, EventBus};
 use rustedclaw_core::identity::Identity;
 use rustedclaw_core::memory::{MemoryBackend, MemoryEntry, MemoryQuery, SearchMode};
 use rustedclaw_core::message::{Conversation, Message};
-use rustedclaw_core::provider::{Provider, ProviderRequest, StreamChunk};
+use rustedclaw_core::provider::{Provider, ProviderRequest};
 use rustedclaw_core::tool::{ToolCall, ToolRegistry};
 use chrono::Utc;
 use tokio::sync::mpsc;
