@@ -61,7 +61,7 @@ jobs:
             BIN=target/release/rustedclaw.exe
           fi
           SIZE=$(stat --format=%s "$BIN" 2>/dev/null || stat -f%z "$BIN" 2>/dev/null)
-          SIZE_MB=$(echo "scale=2; $SIZE / 1048576" | bc)
+          SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $SIZE / 1048576}")
           echo "BINARY_SIZE=${SIZE}" >> $GITHUB_ENV
           echo "BINARY_MB=${SIZE_MB}" >> $GITHUB_ENV
           echo "binary_size=${SIZE_MB} MB (${SIZE} bytes)" >> $GITHUB_STEP_SUMMARY
@@ -291,10 +291,10 @@ jobs:
           echo "| **Binary** | ${BINARY_MB} MB |" >> $GITHUB_STEP_SUMMARY
           echo "| **Cold start** | avg ${COLD_START_AVG}ms (min ${COLD_START_MIN}, max ${COLD_START_MAX}) |" >> $GITHUB_STEP_SUMMARY
           if [ -n "${IDLE_RSS_KB}" ]; then
-            IDLE_MB=$(echo "scale=2; ${IDLE_RSS_KB} / 1024" | bc)
-            LOAD_MB=$(echo "scale=2; ${LOAD_RSS_KB} / 1024" | bc)
-            BURST_MB=$(echo "scale=2; ${BURST_RSS_KB} / 1024" | bc)
-            CHAT_MB=$(echo "scale=2; ${CHAT_RSS_KB} / 1024" | bc)
+            IDLE_MB=$(awk "BEGIN {printf \"%.2f\", ${IDLE_RSS_KB} / 1024}")
+            LOAD_MB=$(awk "BEGIN {printf \"%.2f\", ${LOAD_RSS_KB} / 1024}")
+            BURST_MB=$(awk "BEGIN {printf \"%.2f\", ${BURST_RSS_KB} / 1024}")
+            CHAT_MB=$(awk "BEGIN {printf \"%.2f\", ${CHAT_RSS_KB} / 1024}")
             echo "| **Idle RAM** | ${IDLE_RSS_KB} KiB (${IDLE_MB} MiB) |" >> $GITHUB_STEP_SUMMARY
             echo "| **Threads** | ${THREADS} |" >> $GITHUB_STEP_SUMMARY
             echo "| **After 1K seq req** | ${LOAD_MB} MiB |" >> $GITHUB_STEP_SUMMARY
