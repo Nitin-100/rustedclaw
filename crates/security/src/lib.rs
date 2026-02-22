@@ -13,5 +13,5 @@ pub mod secrets;
 
 pub use allowlist::{AllowlistPolicy, SenderCheckResult};
 pub use audit::{AuditEntry, AuditEvent, AuditLogger, AuditOutcome, AuditSink, TracingSink};
-pub use path::{validate_path, PathValidationError};
+pub use path::{PathValidationError, validate_path};
 pub use secrets::{EncryptedValue, SecretsManager};

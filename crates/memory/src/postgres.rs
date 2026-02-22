@@ -24,8 +24,8 @@
 //! ```
 
 use async_trait::async_trait;
-use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::Row;
+use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use tracing::{debug, info, warn};
 
 use rustedclaw_core::error::MemoryError;
@@ -121,20 +121,13 @@ impl PostgresBackend {
 
         let count = words.len() as f32;
         let where_clause = conditions.join(" OR ");
-        let _score_expr = format!(
-            "({}) / {}",
-            score_parts.join(" + "),
-            count
-        );
+        let _score_expr = format!("({}) / {}", score_parts.join(" + "), count);
 
         (where_clause, count)
     }
 
     /// Perform keyword search.
-    async fn search_keyword(
-        &self,
-        query: &MemoryQuery,
-    ) -> Result<Vec<MemoryEntry>, MemoryError> {
+    async fn search_keyword(&self, query: &MemoryQuery) -> Result<Vec<MemoryEntry>, MemoryError> {
         let words: Vec<&str> = query.text.split_whitespace().collect();
         if words.is_empty() {
             return Ok(Vec::new());
@@ -210,8 +203,7 @@ impl PostgresBackend {
         let tag_filter = if query.tags.is_empty() {
             String::new()
         } else {
-            " AND tags @> $3"
-                .to_string()
+            " AND tags @> $3".to_string()
         };
 
         let sql = format!(
@@ -221,7 +213,8 @@ impl PostgresBackend {
              WHERE embedding IS NOT NULL{tag_filter} \
              AND 1.0 - (embedding <=> $1::vector) >= $2 \
              ORDER BY embedding <=> $1::vector ASC \
-             LIMIT ${}", if query.tags.is_empty() { 3 } else { 4 }
+             LIMIT ${}",
+            if query.tags.is_empty() { 3 } else { 4 }
         );
 
         let embedding_str = format!(
@@ -233,9 +226,7 @@ impl PostgresBackend {
                 .join(",")
         );
 
-        let mut qb = sqlx::query(&sql)
-            .bind(&embedding_str)
-            .bind(query.min_score);
+        let mut qb = sqlx::query(&sql).bind(&embedding_str).bind(query.min_score);
 
         if !query.tags.is_empty() {
             qb = qb.bind(&query.tags);
@@ -350,12 +341,12 @@ impl MemoryBackend for PostgresBackend {
         // Update last_accessed on read.
         let row = sqlx::query(
             "UPDATE memories SET last_accessed = NOW() WHERE id = $1 \
-             RETURNING id, content, tags, source, created_at, last_accessed, score"
+             RETURNING id, content, tags, source, created_at, last_accessed, score",
         )
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| MemoryError::QueryFailed(format!("Failed to get memory: {e}")))?;
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| MemoryError::QueryFailed(format!("Failed to get memory: {e}")))?;
 
         Ok(row.as_ref().map(row_to_entry))
     }

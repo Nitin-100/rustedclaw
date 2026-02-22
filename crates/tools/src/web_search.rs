@@ -43,10 +43,7 @@ impl Tool for WebSearchTool {
             .as_str()
             .ok_or_else(|| ToolError::InvalidArguments("Missing 'query' argument".into()))?;
 
-        let num_results = arguments["num_results"]
-            .as_u64()
-            .unwrap_or(3)
-            .min(5) as usize;
+        let num_results = arguments["num_results"].as_u64().unwrap_or(3).min(5) as usize;
 
         // Generate deterministic mock results based on query content.
         let results = generate_mock_results(query, num_results);
@@ -163,8 +160,7 @@ mod tests {
             .await
             .unwrap();
 
-        let data: Vec<serde_json::Value> =
-            serde_json::from_str(&result.output).unwrap();
+        let data: Vec<serde_json::Value> = serde_json::from_str(&result.output).unwrap();
         assert_eq!(data.len(), 2);
     }
 

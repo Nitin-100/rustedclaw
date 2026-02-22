@@ -28,7 +28,11 @@ pub async fn validate() -> Result<(), Box<dyn std::error::Error>> {
                 warnings.push("Gateway bound to 0.0.0.0 without allow_public_bind = true");
             }
 
-            if config.routines.iter().any(|r| r.schedule.split_whitespace().count() != 5) {
+            if config
+                .routines
+                .iter()
+                .any(|r| r.schedule.split_whitespace().count() != 5)
+            {
                 warnings.push("One or more routines have invalid cron expressions");
             }
 
@@ -44,7 +48,10 @@ pub async fn validate() -> Result<(), Box<dyn std::error::Error>> {
             println!();
             println!("   Provider:  {}", config.default_provider);
             println!("   Model:     {}", config.default_model);
-            println!("   Gateway:   {}:{}", config.gateway.host, config.gateway.port);
+            println!(
+                "   Gateway:   {}:{}",
+                config.gateway.host, config.gateway.port
+            );
             println!("   Memory:    {}", config.memory.backend);
             println!("   Autonomy:  {}", config.autonomy.level);
             println!("   Routines:  {}", config.routines.len());

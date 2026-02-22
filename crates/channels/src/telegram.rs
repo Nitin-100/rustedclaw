@@ -42,9 +42,9 @@ impl TelegramChannel {
     pub async fn inject_message(&self, msg: ChannelMessage) -> Result<(), ChannelError> {
         let guard = self.inject_tx.lock().await;
         if let Some(tx) = guard.as_ref() {
-            tx.send(Ok(msg)).await.map_err(|_| {
-                ChannelError::ConnectionLost("Message channel closed".into())
-            })
+            tx.send(Ok(msg))
+                .await
+                .map_err(|_| ChannelError::ConnectionLost("Message channel closed".into()))
         } else {
             Err(ChannelError::ConnectionLost("Channel not started".into()))
         }
@@ -53,11 +53,17 @@ impl TelegramChannel {
 
 #[async_trait]
 impl Channel for TelegramChannel {
-    fn name(&self) -> &str { "telegram" }
+    fn name(&self) -> &str {
+        "telegram"
+    }
 
-    fn id(&self) -> &ChannelId { &self.channel_id }
+    fn id(&self) -> &ChannelId {
+        &self.channel_id
+    }
 
-    async fn start(&self) -> Result<mpsc::Receiver<Result<ChannelMessage, ChannelError>>, ChannelError> {
+    async fn start(
+        &self,
+    ) -> Result<mpsc::Receiver<Result<ChannelMessage, ChannelError>>, ChannelError> {
         info!("Telegram channel starting (stub mode)");
         let (tx, rx) = mpsc::channel(64);
         *self.inject_tx.lock().await = Some(tx);
@@ -65,7 +71,12 @@ impl Channel for TelegramChannel {
         Ok(rx)
     }
 
-    async fn send(&self, chat_id: &str, content: &str, reply_to: Option<&str>) -> Result<(), ChannelError> {
+    async fn send(
+        &self,
+        chat_id: &str,
+        content: &str,
+        reply_to: Option<&str>,
+    ) -> Result<(), ChannelError> {
         info!(
             chat_id = %chat_id,
             reply_to = ?reply_to,

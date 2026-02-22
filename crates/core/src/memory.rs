@@ -6,10 +6,10 @@
 //! - Vector search (semantic similarity via embeddings)
 //! - Hybrid search (weighted combination of both)
 
+use crate::error::MemoryError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::error::MemoryError;
 
 /// A single memory entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,7 +95,10 @@ pub trait MemoryBackend: Send + Sync {
     async fn store(&self, entry: MemoryEntry) -> std::result::Result<String, MemoryError>;
 
     /// Search memories by query.
-    async fn search(&self, query: MemoryQuery) -> std::result::Result<Vec<MemoryEntry>, MemoryError>;
+    async fn search(
+        &self,
+        query: MemoryQuery,
+    ) -> std::result::Result<Vec<MemoryEntry>, MemoryError>;
 
     /// Delete a memory by ID.
     async fn delete(&self, id: &str) -> std::result::Result<bool, MemoryError>;

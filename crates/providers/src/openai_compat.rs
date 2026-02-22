@@ -29,7 +29,11 @@ pub struct OpenAiCompatProvider {
 
 impl OpenAiCompatProvider {
     /// Create a new OpenAI-compatible provider.
-    pub fn new(name: impl Into<String>, base_url: impl Into<String>, api_key: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> Self {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
             .build()
@@ -178,22 +182,21 @@ impl rustedclaw_core::Provider for OpenAiCompatProvider {
             });
         }
 
-        let api_response: ApiResponse = response
-            .json()
-            .await
-            .map_err(|e| ProviderError::ApiError {
+        let api_response: ApiResponse =
+            response.json().await.map_err(|e| ProviderError::ApiError {
                 status_code: 200,
                 message: format!("Failed to parse response: {e}"),
             })?;
 
-        let choice = api_response
-            .choices
-            .into_iter()
-            .next()
-            .ok_or_else(|| ProviderError::ApiError {
-                status_code: 200,
-                message: "No choices in response".into(),
-            })?;
+        let choice =
+            api_response
+                .choices
+                .into_iter()
+                .next()
+                .ok_or_else(|| ProviderError::ApiError {
+                    status_code: 200,
+                    message: "No choices in response".into(),
+                })?;
 
         let tool_calls: Vec<MessageToolCall> = choice
             .message
@@ -324,19 +327,13 @@ impl rustedclaw_core::Provider for OpenAiCompatProvider {
             });
         }
 
-        let api_resp: EmbeddingApiResponse = response
-            .json()
-            .await
-            .map_err(|e| ProviderError::ApiError {
+        let api_resp: EmbeddingApiResponse =
+            response.json().await.map_err(|e| ProviderError::ApiError {
                 status_code: 200,
                 message: format!("Failed to parse embedding response: {e}"),
             })?;
 
-        let embeddings = api_resp
-            .data
-            .into_iter()
-            .map(|d| d.embedding)
-            .collect();
+        let embeddings = api_resp.data.into_iter().map(|d| d.embedding).collect();
 
         let usage = api_resp.usage.map(|u| Usage {
             prompt_tokens: u.prompt_tokens,
@@ -459,11 +456,10 @@ impl rustedclaw_core::Provider for OpenAiCompatProvider {
                         // "[DONE]" signals end of stream
                         if data == "[DONE]" {
                             // Emit final done chunk with accumulated tool calls
-                            let final_tool_calls: Vec<MessageToolCall> =
-                                tool_call_accumulators
-                                    .values()
-                                    .map(|acc| acc.to_tool_call())
-                                    .collect();
+                            let final_tool_calls: Vec<MessageToolCall> = tool_call_accumulators
+                                .values()
+                                .map(|acc| acc.to_tool_call())
+                                .collect();
 
                             let _ = tx
                                 .send(Ok(StreamChunk {
@@ -741,10 +737,7 @@ mod tests {
 
     #[test]
     fn message_conversion() {
-        let messages = vec![
-            Message::system("You are helpful"),
-            Message::user("Hello"),
-        ];
+        let messages = vec![Message::system("You are helpful"), Message::user("Hello")];
         let api_messages = OpenAiCompatProvider::to_api_messages(&messages);
         assert_eq!(api_messages.len(), 2);
         assert_eq!(api_messages[0].role, "system");
@@ -777,13 +770,9 @@ mod tests {
 
     #[test]
     fn parse_stream_finish_chunk() {
-        let data =
-            r#"{"choices":[{"delta":{},"finish_reason":"stop"}]}"#;
+        let data = r#"{"choices":[{"delta":{},"finish_reason":"stop"}]}"#;
         let parsed: StreamResponse = serde_json::from_str(data).unwrap();
-        assert_eq!(
-            parsed.choices[0].finish_reason.as_deref(),
-            Some("stop")
-        );
+        assert_eq!(parsed.choices[0].finish_reason.as_deref(), Some("stop"));
         assert!(parsed.choices[0].delta.content.is_none());
     }
 

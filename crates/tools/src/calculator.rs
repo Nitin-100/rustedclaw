@@ -98,12 +98,30 @@ fn tokenize(input: &str) -> Result<Vec<Token>, String> {
     while i < chars.len() {
         match chars[i] {
             ' ' | '\t' | '\n' | '\r' => i += 1,
-            '+' => { tokens.push(Token::Plus); i += 1; }
-            '-' => { tokens.push(Token::Minus); i += 1; }
-            '*' => { tokens.push(Token::Star); i += 1; }
-            '/' => { tokens.push(Token::Slash); i += 1; }
-            '(' => { tokens.push(Token::LParen); i += 1; }
-            ')' => { tokens.push(Token::RParen); i += 1; }
+            '+' => {
+                tokens.push(Token::Plus);
+                i += 1;
+            }
+            '-' => {
+                tokens.push(Token::Minus);
+                i += 1;
+            }
+            '*' => {
+                tokens.push(Token::Star);
+                i += 1;
+            }
+            '/' => {
+                tokens.push(Token::Slash);
+                i += 1;
+            }
+            '(' => {
+                tokens.push(Token::LParen);
+                i += 1;
+            }
+            ')' => {
+                tokens.push(Token::RParen);
+                i += 1;
+            }
             c if c.is_ascii_digit() || c == '.' => {
                 let start = i;
                 while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
@@ -256,7 +274,9 @@ mod tests {
 
     #[test]
     fn decimals() {
-        assert_eq!(evaluate("3.14 * 2").unwrap(), 6.28);
+        #[allow(clippy::approx_constant)]
+        let expected = 6.28;
+        assert_eq!(evaluate("3.14 * 2").unwrap(), expected);
     }
 
     #[test]

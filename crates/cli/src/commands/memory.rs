@@ -1,8 +1,8 @@
 //! `rustedclaw memory` — Memory management commands.
 
 use rustedclaw_config::AppConfig;
-use rustedclaw_memory::InMemoryBackend;
 use rustedclaw_core::memory::{MemoryBackend, MemoryQuery, SearchMode};
+use rustedclaw_memory::InMemoryBackend;
 
 pub async fn stats() -> Result<(), Box<dyn std::error::Error>> {
     let config = AppConfig::load().map_err(|e| format!("Failed to load config: {e}"))?;
@@ -12,8 +12,10 @@ pub async fn stats() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Backend:    {}", config.memory.backend);
     println!("  Auto-save:  {}", config.memory.auto_save);
     println!("  Embeddings: {}", config.memory.embedding_provider);
-    println!("  Weights:    vector={:.1}, keyword={:.1}",
-        config.memory.vector_weight, config.memory.keyword_weight);
+    println!(
+        "  Weights:    vector={:.1}, keyword={:.1}",
+        config.memory.vector_weight, config.memory.keyword_weight
+    );
 
     // Show database file info if SQLite
     if config.memory.backend == "sqlite" {
@@ -61,7 +63,11 @@ pub async fn search(query: &str, limit: usize) -> Result<(), Box<dyn std::error:
         println!("   No memories found. (Memory backend may need a running daemon.)");
     } else {
         for (i, entry) in results.iter().enumerate() {
-            println!("  {i:>2}. [score: {:.2}] {}", entry.score, &entry.content[..entry.content.len().min(80)]);
+            println!(
+                "  {i:>2}. [score: {:.2}] {}",
+                entry.score,
+                &entry.content[..entry.content.len().min(80)]
+            );
             if !entry.tags.is_empty() {
                 println!("      tags: {}", entry.tags.join(", "));
             }
@@ -83,7 +89,10 @@ pub async fn export(output: &str) -> Result<(), Box<dyn std::error::Error>> {
         for entry in std::fs::read_dir(&memory_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "md" || e == "txt" || e == "json") {
+            if path
+                .extension()
+                .is_some_and(|e| e == "md" || e == "txt" || e == "json")
+            {
                 let content = std::fs::read_to_string(&path)?;
                 memories.push(serde_json::json!({
                     "file": path.file_name().unwrap().to_string_lossy(),
@@ -138,6 +147,5 @@ mod tests {
     #[test]
     fn memory_stats_runs_without_config() {
         // Just verifying the module compiles
-        assert!(true);
     }
 }

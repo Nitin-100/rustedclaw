@@ -3,11 +3,11 @@
 //! Tools are what give the agent the ability to act in the world:
 //! execute shell commands, read/write files, search the web, etc.
 
+use crate::error::ToolError;
+use crate::provider::ToolDefinition;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::error::ToolError;
-use crate::provider::ToolDefinition;
 
 /// A request to execute a tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,7 +56,10 @@ pub trait Tool: Send + Sync {
     fn parameters_schema(&self) -> serde_json::Value;
 
     /// Execute the tool with the given arguments.
-    async fn execute(&self, arguments: serde_json::Value) -> std::result::Result<ToolResult, ToolError>;
+    async fn execute(
+        &self,
+        arguments: serde_json::Value,
+    ) -> std::result::Result<ToolResult, ToolError>;
 
     /// Convert this tool into a ToolDefinition for sending to the LLM.
     fn to_definition(&self) -> ToolDefinition {
@@ -102,7 +105,10 @@ impl ToolRegistry {
 
     /// Execute a tool call.
     pub async fn execute(&self, call: &ToolCall) -> std::result::Result<ToolResult, ToolError> {
-        let tool = self.tools.get(&call.name).ok_or_else(|| ToolError::NotFound(call.name.clone()))?;
+        let tool = self
+            .tools
+            .get(&call.name)
+            .ok_or_else(|| ToolError::NotFound(call.name.clone()))?;
         tool.execute(call.arguments.clone()).await
     }
 
@@ -127,8 +133,12 @@ mod tests {
 
     #[async_trait]
     impl Tool for EchoTool {
-        fn name(&self) -> &str { "echo" }
-        fn description(&self) -> &str { "Echoes back the input" }
+        fn name(&self) -> &str {
+            "echo"
+        }
+        fn description(&self) -> &str {
+            "Echoes back the input"
+        }
         fn parameters_schema(&self) -> serde_json::Value {
             serde_json::json!({
                 "type": "object",
@@ -138,7 +148,10 @@ mod tests {
                 "required": ["text"]
             })
         }
-        async fn execute(&self, arguments: serde_json::Value) -> std::result::Result<ToolResult, ToolError> {
+        async fn execute(
+            &self,
+            arguments: serde_json::Value,
+        ) -> std::result::Result<ToolResult, ToolError> {
             let text = arguments["text"].as_str().unwrap_or("").to_string();
             Ok(ToolResult {
                 call_id: "test".into(),

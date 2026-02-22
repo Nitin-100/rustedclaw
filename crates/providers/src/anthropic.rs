@@ -130,16 +130,13 @@ impl AnthropicProvider {
                 }
                 Role::Tool => {
                     // Tool results
-                    let tool_call_id =
-                        msg.tool_call_id.clone().unwrap_or_default();
+                    let tool_call_id = msg.tool_call_id.clone().unwrap_or_default();
                     result.push(AnthropicMessage {
                         role: "user".into(),
-                        content: AnthropicContent::Blocks(vec![
-                            ContentBlock::ToolResult {
-                                tool_use_id: tool_call_id,
-                                content: msg.content.clone(),
-                            },
-                        ]),
+                        content: AnthropicContent::Blocks(vec![ContentBlock::ToolResult {
+                            tool_use_id: tool_call_id,
+                            content: msg.content.clone(),
+                        }]),
                     });
                 }
                 Role::System => {} // handled separately
@@ -197,13 +194,13 @@ impl rustedclaw_core::Provider for AnthropicProvider {
             body["stop_sequences"] = serde_json::json!(request.stop);
         }
 
-        if self.extended_thinking {
-            if let Some(budget) = self.thinking_budget {
-                body["thinking"] = serde_json::json!({
-                    "type": "enabled",
-                    "budget_tokens": budget
-                });
-            }
+        if self.extended_thinking
+            && let Some(budget) = self.thinking_budget
+        {
+            body["thinking"] = serde_json::json!({
+                "type": "enabled",
+                "budget_tokens": budget
+            });
         }
 
         debug!(provider = "anthropic", model = %request.model, "Sending completion request");
@@ -240,10 +237,8 @@ impl rustedclaw_core::Provider for AnthropicProvider {
             });
         }
 
-        let api_resp: AnthropicResponse = response
-            .json()
-            .await
-            .map_err(|e| ProviderError::ApiError {
+        let api_resp: AnthropicResponse =
+            response.json().await.map_err(|e| ProviderError::ApiError {
                 status_code: 200,
                 message: format!("Failed to parse Anthropic response: {e}"),
             })?;
@@ -284,13 +279,13 @@ impl rustedclaw_core::Provider for AnthropicProvider {
             body["stop_sequences"] = serde_json::json!(request.stop);
         }
 
-        if self.extended_thinking {
-            if let Some(budget) = self.thinking_budget {
-                body["thinking"] = serde_json::json!({
-                    "type": "enabled",
-                    "budget_tokens": budget
-                });
-            }
+        if self.extended_thinking
+            && let Some(budget) = self.thinking_budget
+        {
+            body["thinking"] = serde_json::json!({
+                "type": "enabled",
+                "budget_tokens": budget
+            });
         }
 
         debug!(provider = "anthropic", model = %request.model, "Sending streaming request");
@@ -371,7 +366,6 @@ impl rustedclaw_core::Provider for AnthropicProvider {
                                     name: std::mem::take(&mut current_tool_name),
                                     arguments: std::mem::take(&mut tool_args_buffer),
                                 });
-                                in_tool_use = false;
                             }
 
                             let _ = tx
@@ -475,25 +469,25 @@ impl rustedclaw_core::Provider for AnthropicProvider {
                             }
                             "message_delta" => {
                                 // May contain usage
-                                if let Some(usage) = event.get("usage") {
-                                    if let (Some(out), Some(inp)) = (
+                                if let Some(usage) = event.get("usage")
+                                    && let (Some(out), Some(inp)) = (
                                         usage["output_tokens"].as_u64(),
                                         usage.get("input_tokens").and_then(|v| v.as_u64()),
-                                    ) {
-                                        let u = Usage {
-                                            prompt_tokens: inp as u32,
-                                            completion_tokens: out as u32,
-                                            total_tokens: (inp + out) as u32,
-                                        };
-                                        let _ = tx
-                                            .send(Ok(StreamChunk {
-                                                content: None,
-                                                tool_calls: Vec::new(),
-                                                done: false,
-                                                usage: Some(u),
-                                            }))
-                                            .await;
-                                    }
+                                    )
+                                {
+                                    let u = Usage {
+                                        prompt_tokens: inp as u32,
+                                        completion_tokens: out as u32,
+                                        total_tokens: (inp + out) as u32,
+                                    };
+                                    let _ = tx
+                                        .send(Ok(StreamChunk {
+                                            content: None,
+                                            tool_calls: Vec::new(),
+                                            done: false,
+                                            usage: Some(u),
+                                        }))
+                                        .await;
                                 }
                             }
                             _ => {}
@@ -659,6 +653,7 @@ struct AnthropicResponse {
     content: Vec<ResponseContentBlock>,
     usage: AnthropicUsage,
     #[serde(default)]
+    #[allow(dead_code)]
     stop_reason: Option<String>,
 }
 
@@ -697,8 +692,8 @@ mod tests {
 
     #[test]
     fn constructor_with_base_url() {
-        let provider = AnthropicProvider::new("sk-ant-test")
-            .with_base_url("https://custom.proxy.com/");
+        let provider =
+            AnthropicProvider::new("sk-ant-test").with_base_url("https://custom.proxy.com/");
         assert_eq!(provider.base_url, "https://custom.proxy.com");
     }
 
@@ -735,7 +730,7 @@ mod tests {
 
     #[test]
     fn message_conversion_user_assistant() {
-        let messages = vec![Message::user("Hello"), Message::assistant("Hi!")];
+        let messages = [Message::user("Hello"), Message::assistant("Hi!")];
         let refs: Vec<&Message> = messages.iter().collect();
         let api_msgs = AnthropicProvider::to_api_messages(&refs);
         assert_eq!(api_msgs.len(), 2);
@@ -819,10 +814,7 @@ mod tests {
         let api_tools = AnthropicProvider::to_api_tools(&tools);
         assert_eq!(api_tools.len(), 1);
         assert_eq!(api_tools[0].name, "calculator");
-        assert_eq!(
-            api_tools[0].input_schema["type"].as_str(),
-            Some("object")
-        );
+        assert_eq!(api_tools[0].input_schema["type"].as_str(), Some("object"));
     }
 
     #[test]
@@ -902,9 +894,7 @@ mod tests {
 
         let msg2 = AnthropicMessage {
             role: "assistant".into(),
-            content: AnthropicContent::Blocks(vec![ContentBlock::Text {
-                text: "Hi".into(),
-            }]),
+            content: AnthropicContent::Blocks(vec![ContentBlock::Text { text: "Hi".into() }]),
         };
         let json2 = serde_json::to_string(&msg2).unwrap();
         assert!(json2.contains("\"type\":\"text\""));

@@ -22,7 +22,10 @@ impl FileWriteTool {
 
     /// Create a file write tool with path restrictions.
     pub fn with_restrictions(allowed_roots: Vec<String>, forbidden_paths: Vec<String>) -> Self {
-        Self { allowed_roots, forbidden_paths }
+        Self {
+            allowed_roots,
+            forbidden_paths,
+        }
     }
 }
 
@@ -34,7 +37,9 @@ impl Default for FileWriteTool {
 
 #[async_trait]
 impl Tool for FileWriteTool {
-    fn name(&self) -> &str { "file_write" }
+    fn name(&self) -> &str {
+        "file_write"
+    }
 
     fn description(&self) -> &str {
         "Write content to a file. Creates the file if it doesn't exist, overwrites if it does."
@@ -67,7 +72,9 @@ impl Tool for FileWriteTool {
             .ok_or_else(|| ToolError::InvalidArguments("Missing 'content' argument".into()))?;
 
         // Validate path against security policy
-        if let Err(e) = rustedclaw_security::validate_path(path, &self.allowed_roots, &self.forbidden_paths) {
+        if let Err(e) =
+            rustedclaw_security::validate_path(path, &self.allowed_roots, &self.forbidden_paths)
+        {
             return Err(ToolError::PermissionDenied {
                 tool_name: "file_write".into(),
                 reason: e.to_string(),
@@ -75,15 +82,15 @@ impl Tool for FileWriteTool {
         }
 
         // Ensure parent directory exists
-        if let Some(parent) = std::path::Path::new(path).parent() {
-            if let Err(e) = tokio::fs::create_dir_all(parent).await {
-                return Ok(ToolResult {
-                    call_id: String::new(),
-                    success: false,
-                    output: format!("Failed to create directory: {e}"),
-                    data: None,
-                });
-            }
+        if let Some(parent) = std::path::Path::new(path).parent()
+            && let Err(e) = tokio::fs::create_dir_all(parent).await
+        {
+            return Ok(ToolResult {
+                call_id: String::new(),
+                success: false,
+                output: format!("Failed to create directory: {e}"),
+                data: None,
+            });
         }
 
         match tokio::fs::write(path, content).await {
@@ -198,10 +205,7 @@ mod tests {
 
     #[tokio::test]
     async fn path_traversal_blocked() {
-        let tool = FileWriteTool::with_restrictions(
-            vec!["/home/user/workspace".into()],
-            vec![],
-        );
+        let tool = FileWriteTool::with_restrictions(vec!["/home/user/workspace".into()], vec![]);
         let result = tool
             .execute(serde_json::json!({
                 "path": "../../../etc/crontab",
@@ -213,10 +217,7 @@ mod tests {
 
     #[tokio::test]
     async fn forbidden_path_blocked() {
-        let tool = FileWriteTool::with_restrictions(
-            vec![],
-            vec!["/etc".into()],
-        );
+        let tool = FileWriteTool::with_restrictions(vec![], vec!["/etc".into()]);
         let result = tool
             .execute(serde_json::json!({
                 "path": "/etc/shadow",

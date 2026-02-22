@@ -138,13 +138,7 @@ impl WorkingMemory {
     // ── Tool results ──
 
     /// Record a tool execution result.
-    pub fn add_tool_result(
-        &mut self,
-        tool_name: &str,
-        input: &str,
-        output: &str,
-        success: bool,
-    ) {
+    pub fn add_tool_result(&mut self, tool_name: &str, input: &str, output: &str, success: bool) {
         self.tool_results.push(ToolResultEntry {
             tool_name: tool_name.to_string(),
             input_summary: input.to_string(),
@@ -179,27 +173,26 @@ impl WorkingMemory {
     /// Advance the plan to the next step, marking the current one completed.
     /// Returns `true` if advancement happened.
     pub fn advance_plan(&mut self, result: Option<String>) -> bool {
-        if let Some(plan) = &mut self.plan {
+        if let Some(plan) = &mut self.plan
+            && plan.current_step < plan.steps.len()
+        {
+            plan.steps[plan.current_step].status = StepStatus::Completed;
+            plan.steps[plan.current_step].result = result;
+            plan.current_step += 1;
             if plan.current_step < plan.steps.len() {
-                plan.steps[plan.current_step].status = StepStatus::Completed;
-                plan.steps[plan.current_step].result = result;
-                plan.current_step += 1;
-                if plan.current_step < plan.steps.len() {
-                    plan.steps[plan.current_step].status = StepStatus::InProgress;
-                }
-                return true;
+                plan.steps[plan.current_step].status = StepStatus::InProgress;
             }
+            return true;
         }
         false
     }
 
     /// Mark the current plan step as failed.
     pub fn fail_plan_step(&mut self, reason: &str) {
-        if let Some(plan) = &mut self.plan {
-            if plan.current_step < plan.steps.len() {
-                plan.steps[plan.current_step].status =
-                    StepStatus::Failed(reason.to_string());
-            }
+        if let Some(plan) = &mut self.plan
+            && plan.current_step < plan.steps.len()
+        {
+            plan.steps[plan.current_step].status = StepStatus::Failed(reason.to_string());
         }
     }
 
@@ -392,11 +385,14 @@ mod tests {
     #[test]
     fn plan_creation_and_advancement() {
         let mut wm = WorkingMemory::default();
-        wm.set_plan("Build a report", vec![
-            "Research data".into(),
-            "Analyze findings".into(),
-            "Write draft".into(),
-        ]);
+        wm.set_plan(
+            "Build a report",
+            vec![
+                "Research data".into(),
+                "Analyze findings".into(),
+                "Write draft".into(),
+            ],
+        );
 
         let plan = wm.plan.as_ref().unwrap();
         assert_eq!(plan.steps.len(), 3);
@@ -449,10 +445,10 @@ mod tests {
     #[test]
     fn render_produces_readable_output() {
         let mut wm = WorkingMemory::default();
-        wm.set_plan("Check weather", vec![
-            "Look up Tokyo".into(),
-            "Give advice".into(),
-        ]);
+        wm.set_plan(
+            "Check weather",
+            vec!["Look up Tokyo".into(), "Give advice".into()],
+        );
         wm.add_thought("Need to check weather");
         wm.add_action("weather_lookup(Tokyo)");
         wm.add_observation("18°C, rain likely");

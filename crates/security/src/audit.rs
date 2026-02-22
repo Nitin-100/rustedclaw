@@ -93,7 +93,14 @@ impl AuditLogger {
     }
 
     /// Record an audit event.
-    pub fn log(&self, event: AuditEvent, actor: &str, target: &str, outcome: AuditOutcome, details: Option<String>) {
+    pub fn log(
+        &self,
+        event: AuditEvent,
+        actor: &str,
+        target: &str,
+        outcome: AuditOutcome,
+        details: Option<String>,
+    ) {
         let entry = AuditEntry {
             timestamp: Utc::now(),
             event,
@@ -201,7 +208,9 @@ mod tests {
             None,
         );
         logger.log(
-            AuditEvent::ToolExecution { tool_name: "shell".into() },
+            AuditEvent::ToolExecution {
+                tool_name: "shell".into(),
+            },
             "user1",
             "shell_tool",
             AuditOutcome::Success,
@@ -235,7 +244,9 @@ mod tests {
     fn audit_entry_serialization() {
         let entry = AuditEntry {
             timestamp: Utc::now(),
-            event: AuditEvent::ToolExecution { tool_name: "file_read".into() },
+            event: AuditEvent::ToolExecution {
+                tool_name: "file_read".into(),
+            },
             actor: "agent".into(),
             target: "/home/user/file.txt".into(),
             outcome: AuditOutcome::Success,
@@ -253,12 +264,24 @@ mod tests {
         let events = vec![
             AuditEvent::PairAttempt,
             AuditEvent::AuthFailure,
-            AuditEvent::ToolExecution { tool_name: "shell".into() },
-            AuditEvent::ConfigChange { key: "provider".into() },
-            AuditEvent::SenderBlocked { channel: "discord".into() },
-            AuditEvent::PathDenied { path: "/etc/passwd".into() },
-            AuditEvent::EndpointDenied { url: "http://169.254.169.254".into() },
-            AuditEvent::SecretAccess { secret_id: "api_key".into() },
+            AuditEvent::ToolExecution {
+                tool_name: "shell".into(),
+            },
+            AuditEvent::ConfigChange {
+                key: "provider".into(),
+            },
+            AuditEvent::SenderBlocked {
+                channel: "discord".into(),
+            },
+            AuditEvent::PathDenied {
+                path: "/etc/passwd".into(),
+            },
+            AuditEvent::EndpointDenied {
+                url: "http://169.254.169.254".into(),
+            },
+            AuditEvent::SecretAccess {
+                secret_id: "api_key".into(),
+            },
         ];
 
         for event in events {
@@ -283,7 +306,9 @@ mod tests {
         }
 
         let received = Arc::new(Mutex::new(Vec::new()));
-        let sink = TestSink { received: received.clone() };
+        let sink = TestSink {
+            received: received.clone(),
+        };
         let logger = AuditLogger::with_sinks(vec![Box::new(sink)]);
 
         logger.log(

@@ -167,8 +167,7 @@ impl SqliteBackend {
             .try_get("last_accessed")
             .map_err(|e| MemoryError::QueryFailed(format!("last_accessed column: {e}")))?;
 
-        let tags: Vec<String> =
-            serde_json::from_str(&tags_json).unwrap_or_default();
+        let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
             .map(|dt| dt.with_timezone(&Utc))
@@ -203,10 +202,7 @@ impl SqliteBackend {
 
     /// Serialize an embedding vector to bytes.
     fn embedding_to_blob(embedding: &[f32]) -> Vec<u8> {
-        embedding
-            .iter()
-            .flat_map(|f| f.to_le_bytes())
-            .collect()
+        embedding.iter().flat_map(|f| f.to_le_bytes()).collect()
     }
 
     /// Build a safe FTS5 query from user text.
@@ -218,7 +214,10 @@ impl SqliteBackend {
             .filter(|w| !w.is_empty())
             .map(|w| {
                 // Strip non-alphanumeric chars and quote
-                let clean: String = w.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
+                let clean: String = w
+                    .chars()
+                    .filter(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
                 if clean.is_empty() {
                     return String::new();
                 }
@@ -247,10 +246,8 @@ impl MemoryBackend for SqliteBackend {
         let created_at = entry.created_at.to_rfc3339();
         let last_accessed = entry.last_accessed.to_rfc3339();
 
-        let embedding_blob: Option<Vec<u8>> = entry
-            .embedding
-            .as_deref()
-            .map(Self::embedding_to_blob);
+        let embedding_blob: Option<Vec<u8>> =
+            entry.embedding.as_deref().map(Self::embedding_to_blob);
 
         sqlx::query(
             r#"
@@ -284,13 +281,11 @@ impl MemoryBackend for SqliteBackend {
     async fn search(&self, query: MemoryQuery) -> Result<Vec<MemoryEntry>, MemoryError> {
         if query.text.trim().is_empty() {
             // Empty query: return most recent entries
-            let rows = sqlx::query(
-                "SELECT * FROM memories ORDER BY created_at DESC LIMIT ?1",
-            )
-            .bind(query.limit as i64)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| MemoryError::QueryFailed(format!("Empty search: {e}")))?;
+            let rows = sqlx::query("SELECT * FROM memories ORDER BY created_at DESC LIMIT ?1")
+                .bind(query.limit as i64)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| MemoryError::QueryFailed(format!("Empty search: {e}")))?;
 
             return rows.iter().map(Self::row_to_entry).collect();
         }
@@ -310,7 +305,9 @@ impl MemoryBackend for SqliteBackend {
                     let conditions: Vec<String> = query
                         .tags
                         .iter()
-                        .map(|t| format!("m.tags LIKE '%\"{}\",%' OR m.tags LIKE '%\"{}\"]%'", t, t))
+                        .map(|t| {
+                            format!("m.tags LIKE '%\"{}\",%' OR m.tags LIKE '%\"{}\"]%'", t, t)
+                        })
                         .collect();
                     format!("AND ({})", conditions.join(" OR "))
                 };
@@ -357,12 +354,10 @@ impl MemoryBackend for SqliteBackend {
                 // Load all entries with embeddings, then rank by cosine similarity.
                 // For a query embedding, the caller should set it on the MemoryQuery
                 // (we parse it from the text field as a fallback, or use all entries).
-                let rows = sqlx::query(
-                    "SELECT * FROM memories WHERE embedding IS NOT NULL"
-                )
-                .fetch_all(&self.pool)
-                .await
-                .map_err(|e| MemoryError::QueryFailed(format!("Vector scan: {e}")))?;
+                let rows = sqlx::query("SELECT * FROM memories WHERE embedding IS NOT NULL")
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| MemoryError::QueryFailed(format!("Vector scan: {e}")))?;
 
                 let entries: Vec<MemoryEntry> = rows
                     .iter()
@@ -370,7 +365,9 @@ impl MemoryBackend for SqliteBackend {
                     .collect();
 
                 if entries.is_empty() {
-                    warn!("Vector search found no entries with embeddings; falling back to keyword");
+                    warn!(
+                        "Vector search found no entries with embeddings; falling back to keyword"
+                    );
                     let mut fallback_query = query;
                     fallback_query.mode = SearchMode::Keyword;
                     return Box::pin(self.search(fallback_query)).await;
@@ -397,12 +394,13 @@ impl MemoryBackend for SqliteBackend {
                 let keyword_results = Box::pin(self.search(keyword_query)).await?;
 
                 // Check if we have embeddings to do vector component
-                let rows = sqlx::query(
-                    "SELECT * FROM memories WHERE embedding IS NOT NULL LIMIT 1"
-                )
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(|e| MemoryError::QueryFailed(format!("Hybrid embed check: {e}")))?;
+                let rows =
+                    sqlx::query("SELECT * FROM memories WHERE embedding IS NOT NULL LIMIT 1")
+                        .fetch_optional(&self.pool)
+                        .await
+                        .map_err(|e| {
+                            MemoryError::QueryFailed(format!("Hybrid embed check: {e}"))
+                        })?;
 
                 if rows.is_none() {
                     // No embeddings available — just return keyword results
@@ -413,12 +411,10 @@ impl MemoryBackend for SqliteBackend {
                 }
 
                 // Load all entries with embeddings for vector ranking
-                let all_rows = sqlx::query(
-                    "SELECT * FROM memories WHERE embedding IS NOT NULL"
-                )
-                .fetch_all(&self.pool)
-                .await
-                .map_err(|e| MemoryError::QueryFailed(format!("Hybrid vector scan: {e}")))?;
+                let all_rows = sqlx::query("SELECT * FROM memories WHERE embedding IS NOT NULL")
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| MemoryError::QueryFailed(format!("Hybrid vector scan: {e}")))?;
 
                 let all_entries: Vec<MemoryEntry> = all_rows
                     .iter()
@@ -427,17 +423,11 @@ impl MemoryBackend for SqliteBackend {
 
                 // Use the first keyword result's embedding as proxy query embedding
                 // (in practice, the agent layer provides the query embedding)
-                let query_emb = keyword_results
-                    .iter()
-                    .find_map(|e| e.embedding.as_ref());
+                let query_emb = keyword_results.iter().find_map(|e| e.embedding.as_ref());
 
                 if let Some(qe) = query_emb {
-                    let vector_results = vector::vector_search(
-                        &all_entries,
-                        qe,
-                        query.limit * 2,
-                        0.0,
-                    );
+                    let vector_results =
+                        vector::vector_search(&all_entries, qe, query.limit * 2, 0.0);
 
                     let merged = vector::reciprocal_rank_fusion(
                         &keyword_results,
@@ -542,7 +532,10 @@ mod tests {
     #[tokio::test]
     async fn store_and_retrieve() {
         let db = test_backend().await;
-        let id = db.store(make_entry("Rust is a systems programming language")).await.unwrap();
+        let id = db
+            .store(make_entry("Rust is a systems programming language"))
+            .await
+            .unwrap();
         assert!(!id.is_empty());
 
         let entry = db.get(&id).await.unwrap().unwrap();
@@ -581,9 +574,15 @@ mod tests {
     #[tokio::test]
     async fn fts5_keyword_search() {
         let db = test_backend().await;
-        db.store(make_entry("Rust is great for systems programming")).await.unwrap();
-        db.store(make_entry("Python is great for scripting")).await.unwrap();
-        db.store(make_entry("JavaScript runs in the browser")).await.unwrap();
+        db.store(make_entry("Rust is great for systems programming"))
+            .await
+            .unwrap();
+        db.store(make_entry("Python is great for scripting"))
+            .await
+            .unwrap();
+        db.store(make_entry("JavaScript runs in the browser"))
+            .await
+            .unwrap();
 
         let results = db
             .search(MemoryQuery {
@@ -604,9 +603,15 @@ mod tests {
     #[tokio::test]
     async fn fts5_multi_word_search() {
         let db = test_backend().await;
-        db.store(make_entry("The quick brown fox jumps over the lazy dog")).await.unwrap();
-        db.store(make_entry("A fast brown cat sits on the mat")).await.unwrap();
-        db.store(make_entry("Rust programming is fun")).await.unwrap();
+        db.store(make_entry("The quick brown fox jumps over the lazy dog"))
+            .await
+            .unwrap();
+        db.store(make_entry("A fast brown cat sits on the mat"))
+            .await
+            .unwrap();
+        db.store(make_entry("Rust programming is fun"))
+            .await
+            .unwrap();
 
         let results = db
             .search(MemoryQuery {
@@ -627,9 +632,18 @@ mod tests {
     #[tokio::test]
     async fn search_with_tags() {
         let db = test_backend().await;
-        db.store(make_tagged_entry("Rust memory safety", vec!["rust", "safety"])).await.unwrap();
-        db.store(make_tagged_entry("Rust performance", vec!["rust", "perf"])).await.unwrap();
-        db.store(make_tagged_entry("Python typing", vec!["python"])).await.unwrap();
+        db.store(make_tagged_entry(
+            "Rust memory safety",
+            vec!["rust", "safety"],
+        ))
+        .await
+        .unwrap();
+        db.store(make_tagged_entry("Rust performance", vec!["rust", "perf"]))
+            .await
+            .unwrap();
+        db.store(make_tagged_entry("Python typing", vec!["python"]))
+            .await
+            .unwrap();
 
         let results = db
             .search(MemoryQuery {
@@ -701,7 +715,10 @@ mod tests {
     #[tokio::test]
     async fn fts5_search_after_delete() {
         let db = test_backend().await;
-        let id = db.store(make_entry("Unique searchable term xyzzy")).await.unwrap();
+        let id = db
+            .store(make_entry("Unique searchable term xyzzy"))
+            .await
+            .unwrap();
         db.store(make_entry("Another entry")).await.unwrap();
 
         // Should find it
@@ -760,12 +777,18 @@ mod tests {
 
     #[tokio::test]
     async fn sanitize_fts_query_basic() {
-        assert_eq!(SqliteBackend::sanitize_fts_query("hello world"), "\"hello\"* \"world\"*");
+        assert_eq!(
+            SqliteBackend::sanitize_fts_query("hello world"),
+            "\"hello\"* \"world\"*"
+        );
     }
 
     #[tokio::test]
     async fn sanitize_fts_query_special_chars() {
-        assert_eq!(SqliteBackend::sanitize_fts_query("hello! @world#"), "\"hello\"* \"world\"*");
+        assert_eq!(
+            SqliteBackend::sanitize_fts_query("hello! @world#"),
+            "\"hello\"* \"world\"*"
+        );
     }
 
     #[tokio::test]
@@ -777,7 +800,9 @@ mod tests {
     async fn search_respects_limit() {
         let db = test_backend().await;
         for i in 0..20 {
-            db.store(make_entry(&format!("Memory about topic number {i}"))).await.unwrap();
+            db.store(make_entry(&format!("Memory about topic number {i}")))
+                .await
+                .unwrap();
         }
 
         let results = db
@@ -818,7 +843,9 @@ mod tests {
     #[tokio::test]
     async fn vector_mode_falls_back_to_keyword() {
         let db = test_backend().await;
-        db.store(make_entry("Fallback vector test content")).await.unwrap();
+        db.store(make_entry("Fallback vector test content"))
+            .await
+            .unwrap();
 
         // Vector mode should fall back to keyword when no embeddings available
         let results = db
@@ -838,8 +865,12 @@ mod tests {
     #[tokio::test]
     async fn hybrid_mode_keyword_only() {
         let db = test_backend().await;
-        db.store(make_entry("Hybrid test without embeddings")).await.unwrap();
-        db.store(make_entry("Unrelated entry about cooking")).await.unwrap();
+        db.store(make_entry("Hybrid test without embeddings"))
+            .await
+            .unwrap();
+        db.store(make_entry("Unrelated entry about cooking"))
+            .await
+            .unwrap();
 
         // Hybrid mode with no embeddings should return keyword results
         let results = db

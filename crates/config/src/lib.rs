@@ -77,10 +77,18 @@ pub struct AppConfig {
     pub routines: Vec<RoutineConfig>,
 }
 
-fn default_provider() -> String { "openrouter".into() }
-fn default_model() -> String { "anthropic/claude-sonnet-4".into() }
-fn default_temperature() -> f32 { 0.7 }
-fn default_max_tokens() -> u32 { 4096 }
+fn default_provider() -> String {
+    "openrouter".into()
+}
+fn default_model() -> String {
+    "anthropic/claude-sonnet-4".into()
+}
+fn default_temperature() -> f32 {
+    0.7
+}
+fn default_max_tokens() -> u32 {
+    4096
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryConfig {
@@ -100,11 +108,21 @@ pub struct MemoryConfig {
     pub keyword_weight: f32,
 }
 
-fn default_memory_backend() -> String { "sqlite".into() }
-fn default_embedding_provider() -> String { "none".into() }
-fn default_vector_weight() -> f32 { 0.7 }
-fn default_keyword_weight() -> f32 { 0.3 }
-fn default_true() -> bool { true }
+fn default_memory_backend() -> String {
+    "sqlite".into()
+}
+fn default_embedding_provider() -> String {
+    "none".into()
+}
+fn default_vector_weight() -> f32 {
+    0.7
+}
+fn default_keyword_weight() -> f32 {
+    0.3
+}
+fn default_true() -> bool {
+    true
+}
 
 impl Default for MemoryConfig {
     fn default() -> Self {
@@ -133,8 +151,12 @@ pub struct GatewayConfig {
     pub allow_public_bind: bool,
 }
 
-fn default_port() -> u16 { 42617 }
-fn default_host() -> String { "127.0.0.1".into() }
+fn default_port() -> u16 {
+    42617
+}
+fn default_host() -> String {
+    "127.0.0.1".into()
+}
 
 impl Default for GatewayConfig {
     fn default() -> Self {
@@ -165,7 +187,9 @@ pub struct AutonomyConfig {
     pub allowed_roots: Vec<String>,
 }
 
-fn default_autonomy_level() -> String { "supervised".into() }
+fn default_autonomy_level() -> String {
+    "supervised".into()
+}
 
 impl Default for AutonomyConfig {
     fn default() -> Self {
@@ -173,12 +197,20 @@ impl Default for AutonomyConfig {
             level: default_autonomy_level(),
             workspace_only: true,
             allowed_commands: vec![
-                "git".into(), "npm".into(), "cargo".into(),
-                "ls".into(), "cat".into(), "grep".into(),
+                "git".into(),
+                "npm".into(),
+                "cargo".into(),
+                "ls".into(),
+                "cat".into(),
+                "grep".into(),
             ],
             forbidden_paths: vec![
-                "/etc".into(), "/root".into(), "/proc".into(),
-                "/sys".into(), "~/.ssh".into(), "~/.gnupg".into(),
+                "/etc".into(),
+                "/root".into(),
+                "/proc".into(),
+                "/sys".into(),
+                "~/.ssh".into(),
+                "~/.gnupg".into(),
                 "~/.aws".into(),
             ],
             allowed_roots: vec![],
@@ -192,7 +224,9 @@ pub struct RuntimeConfig {
     pub kind: String,
 }
 
-fn default_runtime_kind() -> String { "native".into() }
+fn default_runtime_kind() -> String {
+    "native".into()
+}
 
 impl Default for RuntimeConfig {
     fn default() -> Self {
@@ -246,7 +280,9 @@ pub struct IdentityConfig {
     pub load_project_context: bool,
 }
 
-fn default_identity_format() -> String { "rustedclaw".into() }
+fn default_identity_format() -> String {
+    "rustedclaw".into()
+}
 
 impl Default for IdentityConfig {
     fn default() -> Self {
@@ -268,7 +304,9 @@ pub struct HeartbeatConfig {
     pub interval_minutes: u32,
 }
 
-fn default_heartbeat_interval() -> u32 { 30 }
+fn default_heartbeat_interval() -> u32 {
+    30
+}
 
 impl Default for HeartbeatConfig {
     fn default() -> Self {
@@ -285,7 +323,9 @@ pub struct TunnelConfig {
     pub provider: String,
 }
 
-fn default_tunnel_provider() -> String { "none".into() }
+fn default_tunnel_provider() -> String {
+    "none".into()
+}
 
 impl Default for TunnelConfig {
     fn default() -> Self {
@@ -367,7 +407,8 @@ impl AppConfig {
 
         // Environment variable overrides (highest priority)
         if config.api_key.is_none() {
-            config.api_key = std::env::var("RUSTEDCLAW_API_KEY").ok()
+            config.api_key = std::env::var("RUSTEDCLAW_API_KEY")
+                .ok()
                 .or_else(|| std::env::var("OPENROUTER_API_KEY").ok())
                 .or_else(|| std::env::var("OPENAI_API_KEY").ok());
         }
@@ -392,17 +433,15 @@ impl AppConfig {
             return Ok(Self::default());
         }
 
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| ConfigError::ReadError {
-                path: path.to_path_buf(),
-                reason: e.to_string(),
-            })?;
+        let content = std::fs::read_to_string(path).map_err(|e| ConfigError::ReadError {
+            path: path.to_path_buf(),
+            reason: e.to_string(),
+        })?;
 
-        let config: Self = toml::from_str(&content)
-            .map_err(|e| ConfigError::ParseError {
-                path: path.to_path_buf(),
-                reason: e.to_string(),
-            })?;
+        let config: Self = toml::from_str(&content).map_err(|e| ConfigError::ParseError {
+            path: path.to_path_buf(),
+            reason: e.to_string(),
+        })?;
 
         config.validate()?;
         Ok(config)
@@ -522,8 +561,10 @@ mod tests {
 
     #[test]
     fn invalid_temperature_rejected() {
-        let mut config = AppConfig::default();
-        config.default_temperature = 5.0;
+        let config = AppConfig {
+            default_temperature: 5.0,
+            ..AppConfig::default()
+        };
         assert!(config.validate().is_err());
     }
 
@@ -567,10 +608,16 @@ url = "https://myapp.com/health"
         assert_eq!(config.routines[0].name, "daily_summary");
         assert_eq!(config.routines[0].schedule, "0 9 * * *");
         assert_eq!(config.routines[0].target_channel, Some("telegram".into()));
-        assert!(matches!(config.routines[0].action, RoutineAction::AgentTask { .. }));
+        assert!(matches!(
+            config.routines[0].action,
+            RoutineAction::AgentTask { .. }
+        ));
 
         assert_eq!(config.routines[1].name, "health_check");
-        assert!(matches!(config.routines[1].action, RoutineAction::RunTool { .. }));
+        assert!(matches!(
+            config.routines[1].action,
+            RoutineAction::RunTool { .. }
+        ));
     }
 
     #[test]

@@ -33,6 +33,7 @@ pub async fn run(resume: bool) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Check if estop is currently engaged (for use by other subsystems).
+#[allow(dead_code)]
 pub fn is_engaged() -> bool {
     estop_file().exists()
 }

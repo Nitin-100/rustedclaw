@@ -113,7 +113,11 @@ pub fn reciprocal_rank_fusion(
         })
         .collect();
 
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(limit);
     results
 }
@@ -188,7 +192,7 @@ mod tests {
         let a = vec![1.0, 1.0];
         let b = vec![1.0, 0.0];
         let sim = cosine_similarity(&a, &b);
-        assert!((sim - 0.7071).abs() < 0.001);
+        assert!((sim - std::f32::consts::FRAC_1_SQRT_2).abs() < 0.001);
     }
 
     #[test]
@@ -211,8 +215,8 @@ mod tests {
     fn vector_search_respects_min_score() {
         let query = vec![1.0, 0.0];
         let entries = vec![
-            entry("a", Some(vec![1.0, 0.0])),  // sim = 1.0
-            entry("b", Some(vec![0.0, 1.0])),  // sim = 0.0
+            entry("a", Some(vec![1.0, 0.0])), // sim = 1.0
+            entry("b", Some(vec![0.0, 1.0])), // sim = 0.0
         ];
 
         let results = vector_search(&entries, &query, 10, 0.5);
@@ -276,12 +280,8 @@ mod tests {
 
     #[test]
     fn rrf_respects_limit() {
-        let keyword: Vec<_> = (0..20)
-            .map(|i| entry(&format!("k{i}"), None))
-            .collect();
-        let vector: Vec<_> = (0..20)
-            .map(|i| entry(&format!("v{i}"), None))
-            .collect();
+        let keyword: Vec<_> = (0..20).map(|i| entry(&format!("k{i}"), None)).collect();
+        let vector: Vec<_> = (0..20).map(|i| entry(&format!("v{i}"), None)).collect();
 
         let results = reciprocal_rank_fusion(&keyword, &vector, 60, 5);
         assert_eq!(results.len(), 5);

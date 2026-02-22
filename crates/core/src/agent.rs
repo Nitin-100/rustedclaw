@@ -24,8 +24,12 @@ pub struct AgentConfig {
     pub autonomy: AutonomyLevel,
 }
 
-fn default_temp() -> f32 { 0.7 }
-fn default_max_iterations() -> u32 { 25 }
+fn default_temp() -> f32 {
+    0.7
+}
+fn default_max_iterations() -> u32 {
+    25
+}
 
 /// How much freedom the agent has to act.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -41,7 +45,7 @@ pub enum AutonomyLevel {
 }
 
 /// Runtime state of the agent.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentState {
     /// Whether the agent is currently processing a request
     pub is_busy: bool,
@@ -54,17 +58,6 @@ pub struct AgentState {
 
     /// Current active conversations count
     pub active_conversations: usize,
-}
-
-impl Default for AgentState {
-    fn default() -> Self {
-        Self {
-            is_busy: false,
-            requests_processed: 0,
-            total_tokens: 0,
-            active_conversations: 0,
-        }
-    }
 }
 
 #[cfg(test)]

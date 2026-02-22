@@ -22,7 +22,10 @@ impl FileReadTool {
 
     /// Create a file read tool with path restrictions.
     pub fn with_restrictions(allowed_roots: Vec<String>, forbidden_paths: Vec<String>) -> Self {
-        Self { allowed_roots, forbidden_paths }
+        Self {
+            allowed_roots,
+            forbidden_paths,
+        }
     }
 }
 
@@ -34,7 +37,9 @@ impl Default for FileReadTool {
 
 #[async_trait]
 impl Tool for FileReadTool {
-    fn name(&self) -> &str { "file_read" }
+    fn name(&self) -> &str {
+        "file_read"
+    }
 
     fn description(&self) -> &str {
         "Read the contents of a file at the given path."
@@ -59,7 +64,9 @@ impl Tool for FileReadTool {
             .ok_or_else(|| ToolError::InvalidArguments("Missing 'path' argument".into()))?;
 
         // Validate path against security policy
-        if let Err(e) = rustedclaw_security::validate_path(path, &self.allowed_roots, &self.forbidden_paths) {
+        if let Err(e) =
+            rustedclaw_security::validate_path(path, &self.allowed_roots, &self.forbidden_paths)
+        {
             return Err(ToolError::PermissionDenied {
                 tool_name: "file_read".into(),
                 reason: e.to_string(),
@@ -139,10 +146,7 @@ mod tests {
 
     #[tokio::test]
     async fn path_traversal_blocked() {
-        let tool = FileReadTool::with_restrictions(
-            vec!["/home/user/workspace".into()],
-            vec![],
-        );
+        let tool = FileReadTool::with_restrictions(vec!["/home/user/workspace".into()], vec![]);
         let result = tool
             .execute(serde_json::json!({
                 "path": "../../../etc/passwd"
@@ -153,10 +157,7 @@ mod tests {
 
     #[tokio::test]
     async fn forbidden_path_blocked() {
-        let tool = FileReadTool::with_restrictions(
-            vec![],
-            vec!["/etc".into()],
-        );
+        let tool = FileReadTool::with_restrictions(vec![], vec!["/etc".into()]);
         let result = tool
             .execute(serde_json::json!({
                 "path": "/etc/shadow"

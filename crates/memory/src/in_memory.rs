@@ -30,7 +30,9 @@ impl Default for InMemoryBackend {
 
 #[async_trait]
 impl MemoryBackend for InMemoryBackend {
-    fn name(&self) -> &str { "in_memory" }
+    fn name(&self) -> &str {
+        "in_memory"
+    }
 
     async fn store(&self, mut entry: MemoryEntry) -> Result<String, MemoryError> {
         if entry.id.is_empty() {
@@ -49,8 +51,8 @@ impl MemoryBackend for InMemoryBackend {
             .iter()
             .filter(|e| {
                 let content_match = e.content.to_lowercase().contains(&query_lower);
-                let tag_match = query.tags.is_empty()
-                    || query.tags.iter().any(|t| e.tags.contains(t));
+                let tag_match =
+                    query.tags.is_empty() || query.tags.iter().any(|t| e.tags.contains(t));
                 content_match && tag_match
             })
             .cloned()
@@ -64,7 +66,11 @@ impl MemoryBackend for InMemoryBackend {
             .filter(|e| e.score >= query.min_score)
             .collect();
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(query.limit);
 
         Ok(results)
@@ -113,7 +119,10 @@ mod tests {
     #[tokio::test]
     async fn store_and_retrieve() {
         let mem = InMemoryBackend::new();
-        let id = mem.store(test_entry("Rust is a systems language")).await.unwrap();
+        let id = mem
+            .store(test_entry("Rust is a systems language"))
+            .await
+            .unwrap();
         assert!(!id.is_empty());
 
         let entry = mem.get(&id).await.unwrap();
@@ -124,17 +133,26 @@ mod tests {
     #[tokio::test]
     async fn search_by_keyword() {
         let mem = InMemoryBackend::new();
-        mem.store(test_entry("Rust is great for systems programming")).await.unwrap();
-        mem.store(test_entry("Python is great for scripting")).await.unwrap();
-        mem.store(test_entry("JavaScript runs in the browser")).await.unwrap();
+        mem.store(test_entry("Rust is great for systems programming"))
+            .await
+            .unwrap();
+        mem.store(test_entry("Python is great for scripting"))
+            .await
+            .unwrap();
+        mem.store(test_entry("JavaScript runs in the browser"))
+            .await
+            .unwrap();
 
-        let results = mem.search(MemoryQuery {
-            text: "Rust".into(),
-            limit: 10,
-            min_score: 0.0,
-            tags: vec![],
-            mode: SearchMode::Keyword,
-        }).await.unwrap();
+        let results = mem
+            .search(MemoryQuery {
+                text: "Rust".into(),
+                limit: 10,
+                min_score: 0.0,
+                tags: vec![],
+                mode: SearchMode::Keyword,
+            })
+            .await
+            .unwrap();
 
         assert_eq!(results.len(), 1);
         assert!(results[0].content.contains("Rust"));

@@ -1,13 +1,13 @@
 //! The agent reasoning loop implementation.
 
-use std::sync::Arc;
+use chrono::Utc;
 use rustedclaw_core::event::{DomainEvent, EventBus};
 use rustedclaw_core::identity::Identity;
 use rustedclaw_core::memory::{MemoryBackend, MemoryEntry, MemoryQuery, SearchMode};
 use rustedclaw_core::message::{Conversation, Message};
 use rustedclaw_core::provider::{Provider, ProviderRequest};
 use rustedclaw_core::tool::{ToolCall, ToolRegistry};
-use chrono::Utc;
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// The core agent loop that orchestrates LLM calls and tool execution.
@@ -172,8 +172,9 @@ impl AgentLoop {
         // Find the last user message and assistant response
         let messages: Vec<_> = conversation.messages.iter().rev().take(2).collect();
         let (user_msg, assistant_msg) = match messages.as_slice() {
-            [assistant, user] if assistant.role == rustedclaw_core::message::Role::Assistant
-                && user.role == rustedclaw_core::message::Role::User =>
+            [assistant, user]
+                if assistant.role == rustedclaw_core::message::Role::Assistant
+                    && user.role == rustedclaw_core::message::Role::User =>
             {
                 (user.content.clone(), assistant.content.clone())
             }
@@ -185,7 +186,10 @@ impl AgentLoop {
             return;
         }
 
-        let summary = format!("User asked: {}\nAssistant answered: {}", user_msg, assistant_msg);
+        let summary = format!(
+            "User asked: {}\nAssistant answered: {}",
+            user_msg, assistant_msg
+        );
 
         let entry = MemoryEntry {
             id: String::new(), // auto-generated
@@ -236,7 +240,9 @@ impl AgentLoop {
         if conversation.messages.is_empty()
             || conversation.messages[0].role != rustedclaw_core::message::Role::System
         {
-            conversation.messages.insert(0, Message::system(&system_prompt));
+            conversation
+                .messages
+                .insert(0, Message::system(&system_prompt));
         } else {
             // Update existing system prompt with recalled memories
             conversation.messages[0] = Message::system(&system_prompt);
@@ -344,10 +350,7 @@ impl AgentLoop {
                         });
 
                         // Report error to the LLM so it can recover
-                        conversation.push(Message::tool_result(
-                            &tc.id,
-                            &format!("Error: {e}"),
-                        ));
+                        conversation.push(Message::tool_result(&tc.id, format!("Error: {e}")));
                     }
                 }
             }
@@ -374,7 +377,9 @@ mod tests {
 
     #[async_trait::async_trait]
     impl Provider for MockProvider {
-        fn name(&self) -> &str { "mock" }
+        fn name(&self) -> &str {
+            "mock"
+        }
 
         async fn complete(
             &self,
@@ -421,8 +426,8 @@ mod tests {
 
     #[tokio::test]
     async fn memory_recall_injects_context() {
-        use rustedclaw_memory::InMemoryBackend;
         use rustedclaw_core::memory::MemoryBackend;
+        use rustedclaw_memory::InMemoryBackend;
 
         let mem = Arc::new(InMemoryBackend::new());
         // Pre-store a memory
@@ -435,7 +440,9 @@ mod tests {
             last_accessed: Utc::now(),
             score: 0.0,
             embedding: None,
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
 
         let provider = Arc::new(MockProvider {
             response: "Your favorite color is blue!".into(),
@@ -461,18 +468,22 @@ mod tests {
 
         // System prompt should contain recalled memory
         let system_msg = &conv.messages[0].content;
-        assert!(system_msg.contains("favorite color is blue"), "System prompt should contain recalled memory: {system_msg}");
+        assert!(
+            system_msg.contains("favorite color is blue"),
+            "System prompt should contain recalled memory: {system_msg}"
+        );
     }
 
     #[tokio::test]
     async fn auto_save_stores_conversation() {
-        use rustedclaw_memory::InMemoryBackend;
         use rustedclaw_core::memory::MemoryBackend;
+        use rustedclaw_memory::InMemoryBackend;
 
         let mem = Arc::new(InMemoryBackend::new());
 
         let provider = Arc::new(MockProvider {
-            response: "Rust is a systems programming language known for safety and performance.".into(),
+            response: "Rust is a systems programming language known for safety and performance."
+                .into(),
         });
         let tools = Arc::new(ToolRegistry::new());
         let event_bus = Arc::new(EventBus::default());
@@ -497,13 +508,16 @@ mod tests {
         let count = mem.count().await.unwrap();
         assert_eq!(count, 1, "Auto-save should have stored one memory");
 
-        let results = mem.search(MemoryQuery {
-            text: "Rust".into(),
-            limit: 10,
-            min_score: 0.0,
-            tags: vec![],
-            mode: SearchMode::Keyword,
-        }).await.unwrap();
+        let results = mem
+            .search(MemoryQuery {
+                text: "Rust".into(),
+                limit: 10,
+                min_score: 0.0,
+                tags: vec![],
+                mode: SearchMode::Keyword,
+            })
+            .await
+            .unwrap();
 
         assert_eq!(results.len(), 1);
         assert!(results[0].content.contains("Rust"));
@@ -512,8 +526,8 @@ mod tests {
 
     #[tokio::test]
     async fn no_auto_save_without_flag() {
-        use rustedclaw_memory::InMemoryBackend;
         use rustedclaw_core::memory::MemoryBackend;
+        use rustedclaw_memory::InMemoryBackend;
 
         let mem = Arc::new(InMemoryBackend::new());
 
@@ -551,18 +565,16 @@ mod tests {
 
     #[tokio::test]
     async fn format_memory_context_with_entries() {
-        let entries = vec![
-            MemoryEntry {
-                id: "1".into(),
-                content: "User likes Rust".into(),
-                tags: vec![],
-                source: None,
-                created_at: Utc::now(),
-                last_accessed: Utc::now(),
-                score: 0.95,
-                embedding: None,
-            },
-        ];
+        let entries = vec![MemoryEntry {
+            id: "1".into(),
+            content: "User likes Rust".into(),
+            tags: vec![],
+            source: None,
+            created_at: Utc::now(),
+            last_accessed: Utc::now(),
+            score: 0.95,
+            embedding: None,
+        }];
         let ctx = AgentLoop::format_memory_context(&entries);
         assert!(ctx.contains("Recalled Memories"));
         assert!(ctx.contains("User likes Rust"));

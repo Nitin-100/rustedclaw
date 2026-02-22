@@ -23,7 +23,9 @@ pub mod wasm_tool;
 use rustedclaw_core::tool::ToolRegistry;
 
 #[cfg(feature = "wasm")]
-pub use wasm_tool::{WasmTool, WasmToolConfig, WasmCapability, WasmPolicy, load_wasm_tools_from_dir};
+pub use wasm_tool::{
+    WasmCapability, WasmPolicy, WasmTool, WasmToolConfig, load_wasm_tools_from_dir,
+};
 
 /// Create a default tool registry with all built-in tools.
 pub fn default_registry() -> ToolRegistry {

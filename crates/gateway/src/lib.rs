@@ -10,11 +10,11 @@ pub mod api_v1;
 pub mod frontend;
 
 use axum::{
+    Router,
     extract::State,
     http::StatusCode,
     response::Json,
     routing::{get, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -57,7 +57,7 @@ pub fn build_full_router(legacy_state: SharedState, api_state: api_v1::SharedApi
         .route("/pair", post(pair_handler))
         .route("/webhook", post(webhook_handler))
         .with_state(legacy_state) // Router<()>
-        .nest("/v1", v1)          // Both Router<()> now
+        .nest("/v1", v1) // Both Router<()> now
         .merge(frontend::frontend_router()) // Serve embedded frontend
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }
@@ -102,14 +102,17 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
     let event_bus = Arc::new(EventBus::default());
 
     // Shared agent for legacy routes (reuses same provider/tools/identity)
-    let agent = Arc::new(AgentLoop::new(
-        provider.clone(),
-        &config.default_model,
-        config.default_temperature,
-        tools.clone(),
-        identity.clone(),
-        event_bus.clone(),
-    ).with_max_tokens(config.default_max_tokens));
+    let agent = Arc::new(
+        AgentLoop::new(
+            provider.clone(),
+            &config.default_model,
+            config.default_temperature,
+            tools.clone(),
+            identity.clone(),
+            event_bus.clone(),
+        )
+        .with_max_tokens(config.default_max_tokens),
+    );
 
     // Build shared state for legacy routes.
     let legacy_state = Arc::new(RwLock::new(GatewayState {
@@ -183,9 +186,7 @@ async fn pair_handler(
     let expected_code = state_read.pairing_code.as_deref();
 
     if let Some(expected) = expected_code {
-        let provided = headers
-            .get("X-Pairing-Code")
-            .and_then(|v| v.to_str().ok());
+        let provided = headers.get("X-Pairing-Code").and_then(|v| v.to_str().ok());
 
         if provided != Some(expected) {
             return Err(StatusCode::UNAUTHORIZED);
@@ -271,9 +272,7 @@ mod tests {
     fn test_state() -> SharedState {
         let config = rustedclaw_config::AppConfig::default();
         let router = rustedclaw_providers::router::build_from_config(&config);
-        let provider = router
-            .default()
-            .expect("No default provider configured");
+        let provider = router.default().expect("No default provider configured");
         let context_paths = ContextPaths {
             global_dir: Some(rustedclaw_config::AppConfig::workspace_dir()),
             project_dir: None,
@@ -283,14 +282,17 @@ mod tests {
         let identity = Identity::load(&context_paths);
         let tools = Arc::new(rustedclaw_tools::default_registry());
         let event_bus = Arc::new(EventBus::default());
-        let agent = Arc::new(AgentLoop::new(
-            provider,
-            &config.default_model,
-            config.default_temperature,
-            tools,
-            identity,
-            event_bus,
-        ).with_max_tokens(config.default_max_tokens));
+        let agent = Arc::new(
+            AgentLoop::new(
+                provider,
+                &config.default_model,
+                config.default_temperature,
+                tools,
+                identity,
+                event_bus,
+            )
+            .with_max_tokens(config.default_max_tokens),
+        );
         Arc::new(RwLock::new(GatewayState {
             config,
             pairing_code: None,

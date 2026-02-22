@@ -1,9 +1,9 @@
 //! Shared test helpers for pattern tests.
 
-use std::sync::Mutex;
 use rustedclaw_core::error::ProviderError;
 use rustedclaw_core::message::Message;
 use rustedclaw_core::provider::{Provider, ProviderRequest, ProviderResponse, Usage};
+use std::sync::Mutex;
 
 /// A mock provider that returns a sequence of scripted responses.
 ///
@@ -39,6 +39,7 @@ impl SequentialMockProvider {
         ])
     }
 
+    #[allow(dead_code)]
     pub fn call_count(&self) -> usize {
         *self.call_count.lock().unwrap()
     }
@@ -50,10 +51,7 @@ impl Provider for SequentialMockProvider {
         "sequential_mock"
     }
 
-    async fn complete(
-        &self,
-        _request: ProviderRequest,
-    ) -> Result<ProviderResponse, ProviderError> {
+    async fn complete(&self, _request: ProviderRequest) -> Result<ProviderResponse, ProviderError> {
         let mut count = self.call_count.lock().unwrap();
         let responses = self.responses.lock().unwrap();
 
@@ -105,7 +103,10 @@ pub fn make_tool_call_response(
 }
 
 /// Helper to create a tool call.
-pub fn make_tool_call(name: &str, args: serde_json::Value) -> rustedclaw_core::message::MessageToolCall {
+pub fn make_tool_call(
+    name: &str,
+    args: serde_json::Value,
+) -> rustedclaw_core::message::MessageToolCall {
     rustedclaw_core::message::MessageToolCall {
         id: format!("call_{}", name),
         name: name.to_string(),

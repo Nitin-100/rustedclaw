@@ -13,12 +13,29 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Model:        {}", config.default_model);
     println!("  Temperature:  {}", config.default_temperature);
     println!("  Memory:       {}", config.memory.backend);
-    println!("  Gateway:      {}:{}", config.gateway.host, config.gateway.port);
+    println!(
+        "  Gateway:      {}:{}",
+        config.gateway.host, config.gateway.port
+    );
     println!("  Autonomy:     {}", config.autonomy.level);
     println!("  Runtime:      {}", config.runtime.kind);
-    println!("  Heartbeat:    {}", if config.heartbeat.enabled { "enabled" } else { "disabled" });
+    println!(
+        "  Heartbeat:    {}",
+        if config.heartbeat.enabled {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
     println!("  Tunnel:       {}", config.tunnel.provider);
-    println!("  Secrets:      {}", if config.secrets.encrypt { "encrypted" } else { "plaintext" });
+    println!(
+        "  Secrets:      {}",
+        if config.secrets.encrypt {
+            "encrypted"
+        } else {
+            "plaintext"
+        }
+    );
 
     // Check config file existence
     let config_path = AppConfig::config_dir().join("config.toml");

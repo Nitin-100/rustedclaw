@@ -20,7 +20,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     if !workspace_dir.exists() {
         std::fs::create_dir_all(&workspace_dir)?;
-        println!("✅ Created workspace directory: {}", workspace_dir.display());
+        println!(
+            "✅ Created workspace directory: {}",
+            workspace_dir.display()
+        );
     }
 
     // Create default identity files

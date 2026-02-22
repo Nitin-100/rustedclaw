@@ -45,10 +45,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone, Error)]
 pub enum ProviderError {
     #[error("API request failed: {message} (status: {status_code})")]
-    ApiError {
-        status_code: u16,
-        message: String,
-    },
+    ApiError { status_code: u16, message: String },
 
     #[error("Rate limited by provider, retry after {retry_after_secs}s")]
     RateLimited { retry_after_secs: u64 },
@@ -114,7 +111,10 @@ pub enum ToolError {
     ExecutionFailed { tool_name: String, reason: String },
 
     #[error("Tool timed out: {tool_name} after {timeout_secs}s")]
-    Timeout { tool_name: String, timeout_secs: u64 },
+    Timeout {
+        tool_name: String,
+        timeout_secs: u64,
+    },
 
     #[error("Permission denied: {tool_name} — {reason}")]
     PermissionDenied { tool_name: String, reason: String },

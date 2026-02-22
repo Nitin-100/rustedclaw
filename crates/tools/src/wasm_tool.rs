@@ -256,11 +256,20 @@ impl WasmTool {
         let mut engine_config = Config::new();
         engine_config.consume_fuel(config.max_fuel > 0);
 
-        let engine = Engine::new(&engine_config)
-            .map_err(|e| ToolError::ExecutionFailed { tool_name: config.name.clone(), reason: format!("Failed to create WASM engine: {e}") })?;
+        let engine = Engine::new(&engine_config).map_err(|e| ToolError::ExecutionFailed {
+            tool_name: config.name.clone(),
+            reason: format!("Failed to create WASM engine: {e}"),
+        })?;
 
-        let module = Module::from_file(&engine, &config.wasm_path)
-            .map_err(|e| ToolError::ExecutionFailed { tool_name: config.name.clone(), reason: format!("Failed to load WASM module '{}': {e}", config.wasm_path.display()) })?;
+        let module = Module::from_file(&engine, &config.wasm_path).map_err(|e| {
+            ToolError::ExecutionFailed {
+                tool_name: config.name.clone(),
+                reason: format!(
+                    "Failed to load WASM module '{}': {e}",
+                    config.wasm_path.display()
+                ),
+            }
+        })?;
 
         info!(
             name = %config.name,
@@ -304,11 +313,15 @@ impl WasmTool {
         let mut engine_config = Config::new();
         engine_config.consume_fuel(config.max_fuel > 0);
 
-        let engine = Engine::new(&engine_config)
-            .map_err(|e| ToolError::ExecutionFailed { tool_name: config.name.clone(), reason: format!("Failed to create WASM engine: {e}") })?;
+        let engine = Engine::new(&engine_config).map_err(|e| ToolError::ExecutionFailed {
+            tool_name: config.name.clone(),
+            reason: format!("Failed to create WASM engine: {e}"),
+        })?;
 
-        let module = Module::new(&engine, wasm_bytes)
-            .map_err(|e| ToolError::ExecutionFailed { tool_name: config.name.clone(), reason: format!("Failed to compile WASM module: {e}") })?;
+        let module = Module::new(&engine, wasm_bytes).map_err(|e| ToolError::ExecutionFailed {
+            tool_name: config.name.clone(),
+            reason: format!("Failed to compile WASM module: {e}"),
+        })?;
 
         info!(name = %config.name, capabilities = ?config.capabilities, "Loaded WASM tool from bytes");
 
@@ -335,20 +348,30 @@ impl WasmTool {
 
         // Set fuel limit if configured.
         if self.config.max_fuel > 0 {
-            store.set_fuel(self.config.max_fuel)
-                .map_err(|e| ToolError::ExecutionFailed { tool_name: self.config.name.clone(), reason: format!("Failed to set fuel: {e}") })?;
+            store
+                .set_fuel(self.config.max_fuel)
+                .map_err(|e| ToolError::ExecutionFailed {
+                    tool_name: self.config.name.clone(),
+                    reason: format!("Failed to set fuel: {e}"),
+                })?;
         }
 
         // Create the instance with an empty linker (sandboxed — no WASI or imports).
         let linker = Linker::new(&self.engine);
-        let instance = linker
-            .instantiate(&mut store, &self.module)
-            .map_err(|e| ToolError::ExecutionFailed { tool_name: self.config.name.clone(), reason: format!("WASM instantiation failed: {e}") })?;
+        let instance = linker.instantiate(&mut store, &self.module).map_err(|e| {
+            ToolError::ExecutionFailed {
+                tool_name: self.config.name.clone(),
+                reason: format!("WASM instantiation failed: {e}"),
+            }
+        })?;
 
         // Get the exported memory.
-        let memory = instance
-            .get_memory(&mut store, "memory")
-            .ok_or_else(|| ToolError::ExecutionFailed { tool_name: self.config.name.clone(), reason: "WASM module must export 'memory'".into() })?;
+        let memory = instance.get_memory(&mut store, "memory").ok_or_else(|| {
+            ToolError::ExecutionFailed {
+                tool_name: self.config.name.clone(),
+                reason: "WASM module must export 'memory'".into(),
+            }
+        })?;
 
         // Enforce memory limit — check current size and reject if over limit.
         let current_mem_bytes = memory.data_size(&store);
@@ -365,14 +388,21 @@ impl WasmTool {
         // Get the allocator function.
         let alloc = instance
             .get_typed_func::<i32, i32>(&mut store, "alloc")
-            .map_err(|e| ToolError::ExecutionFailed { tool_name: self.config.name.clone(), reason: format!("WASM module must export 'alloc(i32) -> i32': {e}") })?;
+            .map_err(|e| ToolError::ExecutionFailed {
+                tool_name: self.config.name.clone(),
+                reason: format!("WASM module must export 'alloc(i32) -> i32': {e}"),
+            })?;
 
         // Allocate space for the input JSON.
         let input_bytes = input_json.as_bytes();
         let input_len = input_bytes.len() as i32;
-        let input_ptr = alloc
-            .call(&mut store, input_len)
-            .map_err(|e| ToolError::ExecutionFailed { tool_name: self.config.name.clone(), reason: format!("alloc failed: {e}") })?;
+        let input_ptr =
+            alloc
+                .call(&mut store, input_len)
+                .map_err(|e| ToolError::ExecutionFailed {
+                    tool_name: self.config.name.clone(),
+                    reason: format!("alloc failed: {e}"),
+                })?;
 
         // Write input to WASM memory.
         let mem_data = memory.data_mut(&mut store);
@@ -389,7 +419,10 @@ impl WasmTool {
         // Call the execute function.
         let execute = instance
             .get_typed_func::<(i32, i32), i32>(&mut store, "execute")
-            .map_err(|e| ToolError::ExecutionFailed { tool_name: self.config.name.clone(), reason: format!("WASM module must export 'execute(i32, i32) -> i32': {e}") })?;
+            .map_err(|e| ToolError::ExecutionFailed {
+                tool_name: self.config.name.clone(),
+                reason: format!("WASM module must export 'execute(i32, i32) -> i32': {e}"),
+            })?;
 
         let result_ptr = execute
             .call(&mut store, (input_ptr, input_len))
@@ -401,7 +434,10 @@ impl WasmTool {
                         reason: "WASM execution exceeded fuel limit (too many instructions)".into(),
                     }
                 } else {
-                    ToolError::ExecutionFailed { tool_name: self.config.name.clone(), reason: format!("WASM execute failed: {e}") }
+                    ToolError::ExecutionFailed {
+                        tool_name: self.config.name.clone(),
+                        reason: format!("WASM execute failed: {e}"),
+                    }
                 }
             })?;
 
@@ -423,8 +459,12 @@ impl WasmTool {
             .map(|pos| result_start + pos)
             .unwrap_or(mem_data.len());
 
-        let result_str = std::str::from_utf8(&mem_data[result_start..result_end])
-            .map_err(|e| ToolError::ExecutionFailed { tool_name: self.config.name.clone(), reason: format!("Invalid UTF-8 in WASM output: {e}") })?;
+        let result_str = std::str::from_utf8(&mem_data[result_start..result_end]).map_err(|e| {
+            ToolError::ExecutionFailed {
+                tool_name: self.config.name.clone(),
+                reason: format!("Invalid UTF-8 in WASM output: {e}"),
+            }
+        })?;
 
         Ok(result_str.to_string())
     }
@@ -448,8 +488,9 @@ impl Tool for WasmTool {
         &self,
         arguments: serde_json::Value,
     ) -> std::result::Result<ToolResult, ToolError> {
-        let input_json = serde_json::to_string(&arguments)
-            .map_err(|e| ToolError::InvalidArguments(format!("Failed to serialize arguments: {e}")))?;
+        let input_json = serde_json::to_string(&arguments).map_err(|e| {
+            ToolError::InvalidArguments(format!("Failed to serialize arguments: {e}"))
+        })?;
 
         debug!(name = %self.config.name, "Executing WASM tool");
 
@@ -547,9 +588,15 @@ pub fn load_wasm_tools_from_dir_with_policy(dir: &Path, policy: &WasmPolicy) -> 
 }
 
 /// Load a single WASM tool from its manifest file.
-fn load_wasm_tool_from_manifest(manifest_path: &Path, policy: &WasmPolicy) -> Result<WasmTool, ToolError> {
-    let manifest_content = std::fs::read_to_string(manifest_path)
-        .map_err(|e| ToolError::ExecutionFailed { tool_name: "wasm".to_string(), reason: format!("Failed to read manifest: {e}") })?;
+fn load_wasm_tool_from_manifest(
+    manifest_path: &Path,
+    policy: &WasmPolicy,
+) -> Result<WasmTool, ToolError> {
+    let manifest_content =
+        std::fs::read_to_string(manifest_path).map_err(|e| ToolError::ExecutionFailed {
+            tool_name: "wasm".to_string(),
+            reason: format!("Failed to read manifest: {e}"),
+        })?;
 
     let mut config: WasmToolConfig = serde_json::from_str(&manifest_content)
         .map_err(|e| ToolError::InvalidArguments(format!("Invalid tool manifest: {e}")))?;
@@ -572,12 +619,15 @@ mod tests {
 
     #[test]
     fn wasm_tool_config_defaults() {
-        let config: WasmToolConfig = serde_json::from_str(r#"{
+        let config: WasmToolConfig = serde_json::from_str(
+            r#"{
             "name": "test_tool",
             "description": "A test tool",
             "parameters_schema": {"type": "object"},
             "wasm_path": "test.wasm"
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
 
         assert_eq!(config.name, "test_tool");
         assert_eq!(config.max_memory_bytes, 16 * 1024 * 1024);
@@ -588,7 +638,8 @@ mod tests {
 
     #[test]
     fn wasm_tool_config_custom() {
-        let config: WasmToolConfig = serde_json::from_str(r#"{
+        let config: WasmToolConfig = serde_json::from_str(
+            r#"{
             "name": "custom",
             "description": "Custom tool",
             "parameters_schema": {"type": "object", "properties": {"x": {"type": "number"}}},
@@ -597,7 +648,9 @@ mod tests {
             "max_fuel": 500000,
             "timeout_ms": 5000,
             "capabilities": ["fs_read", "net"]
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
 
         assert_eq!(config.max_memory_bytes, 1_048_576);
         assert_eq!(config.max_fuel, 500_000);
@@ -725,7 +778,10 @@ mod tests {
         let tool = WasmTool::from_bytes(config, &wasm_bytes).unwrap();
 
         // Use the Tool trait's execute method.
-        let result = tool.execute(serde_json::json!({"key": "value"})).await.unwrap();
+        let result = tool
+            .execute(serde_json::json!({"key": "value"}))
+            .await
+            .unwrap();
         assert!(result.success);
         assert_eq!(result.output, "done");
     }
@@ -828,13 +884,29 @@ mod tests {
         };
 
         // Allowed
-        assert!(policy.validate_capabilities(&[WasmCapability::FsRead]).is_ok());
+        assert!(
+            policy
+                .validate_capabilities(&[WasmCapability::FsRead])
+                .is_ok()
+        );
         assert!(policy.validate_capabilities(&[WasmCapability::Net]).is_ok());
-        assert!(policy.validate_capabilities(&[WasmCapability::FsRead, WasmCapability::Net]).is_ok());
+        assert!(
+            policy
+                .validate_capabilities(&[WasmCapability::FsRead, WasmCapability::Net])
+                .is_ok()
+        );
 
         // Denied
-        assert!(policy.validate_capabilities(&[WasmCapability::FsWrite]).is_err());
-        assert!(policy.validate_capabilities(&[WasmCapability::Env]).is_err());
+        assert!(
+            policy
+                .validate_capabilities(&[WasmCapability::FsWrite])
+                .is_err()
+        );
+        assert!(
+            policy
+                .validate_capabilities(&[WasmCapability::Env])
+                .is_err()
+        );
     }
 
     #[test]

@@ -6,8 +6,8 @@
 use async_trait::async_trait;
 use rustedclaw_core::channel::{Channel, ChannelId, ChannelMessage};
 use rustedclaw_core::error::ChannelError;
-use tokio::sync::mpsc;
 use tokio::io::{self, AsyncBufReadExt, BufReader};
+use tokio::sync::mpsc;
 
 /// Interactive CLI channel for terminal-based chat.
 pub struct CliChannel {
@@ -58,10 +58,7 @@ impl Channel for CliChannel {
                         }
 
                         // Check for exit commands
-                        if matches!(
-                            line.as_str(),
-                            "exit" | "quit" | "/exit" | "/quit" | ":q"
-                        ) {
+                        if matches!(line.as_str(), "exit" | "quit" | "/exit" | "/quit" | ":q") {
                             break;
                         }
 
@@ -82,7 +79,9 @@ impl Channel for CliChannel {
                     }
                     Ok(None) => break, // EOF (Ctrl+D)
                     Err(e) => {
-                        let _ = tx.send(Err(ChannelError::ConnectionLost(e.to_string()))).await;
+                        let _ = tx
+                            .send(Err(ChannelError::ConnectionLost(e.to_string())))
+                            .await;
                         break;
                     }
                 }

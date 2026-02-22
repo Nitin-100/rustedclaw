@@ -193,8 +193,7 @@ mod tests {
             .await
             .unwrap();
 
-        let data: Vec<serde_json::Value> =
-            serde_json::from_str(&result.output).unwrap();
+        let data: Vec<serde_json::Value> = serde_json::from_str(&result.output).unwrap();
         assert_eq!(data.len(), 2);
     }
 
@@ -207,8 +206,7 @@ mod tests {
             .unwrap();
 
         assert!(result.success);
-        let data: Vec<serde_json::Value> =
-            serde_json::from_str(&result.output).unwrap();
+        let data: Vec<serde_json::Value> = serde_json::from_str(&result.output).unwrap();
         assert_eq!(data.len(), 3); // default top_k
     }
 

@@ -13,21 +13,21 @@
 //! - `POST /v1/context/debug`      — Context assembly debug view
 
 use axum::{
-    extract::{Path, State},
-    extract::ws::{WebSocket, WebSocketUpgrade, Message as WsMessage},
-    http::StatusCode,
-    response::{Json, IntoResponse},
-    response::sse::{Event as SseEvent, Sse},
-    routing::{get, post},
     Router,
+    extract::ws::{Message as WsMessage, WebSocket, WebSocketUpgrade},
+    extract::{Path, State},
+    http::StatusCode,
+    response::sse::{Event as SseEvent, Sse},
+    response::{IntoResponse, Json},
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 use tracing::info;
 
 use rustedclaw_agent::{
@@ -80,7 +80,10 @@ pub fn v1_router(state: SharedApiState) -> Router {
         .route("/routines", get(list_routines_handler))
         .route("/routines", post(create_routine_handler))
         .route("/routines/{id}", axum::routing::put(update_routine_handler))
-        .route("/routines/{id}", axum::routing::delete(delete_routine_handler))
+        .route(
+            "/routines/{id}",
+            axum::routing::delete(delete_routine_handler),
+        )
         .route("/documents", post(ingest_document_handler))
         .route("/memory", get(search_memory_handler))
         .route("/memory", post(create_memory_handler))
@@ -421,7 +424,10 @@ async fn chat_handler(
         other => Err((
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
-                error: format!("Unknown pattern: '{}'. Use 'react', 'rag', or 'direct'.", other),
+                error: format!(
+                    "Unknown pattern: '{}'. Use 'react', 'rag', or 'direct'.",
+                    other
+                ),
             }),
         )),
     }
@@ -433,7 +439,10 @@ async fn chat_handler(
 async fn chat_stream_handler(
     State(state): State<SharedApiState>,
     Json(payload): Json<ChatRequest>,
-) -> Result<Sse<impl futures::Stream<Item = Result<SseEvent, Infallible>>>, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<
+    Sse<impl futures::Stream<Item = Result<SseEvent, Infallible>>>,
+    (StatusCode, Json<ErrorResponse>),
+> {
     info!(pattern = %payload.pattern, "v1/chat/stream SSE request");
 
     let conv_id = payload
@@ -510,7 +519,7 @@ async fn handle_ws_connection(mut socket: WebSocket, state: SharedApiState) {
         let msg = match msg {
             Ok(WsMessage::Text(text)) => text,
             Ok(WsMessage::Close(_)) => break,
-            Ok(_) => continue,  // ignore binary, ping, pong
+            Ok(_) => continue, // ignore binary, ping, pong
             Err(_) => break,
         };
 
@@ -520,9 +529,11 @@ async fn handle_ws_connection(mut socket: WebSocket, state: SharedApiState) {
                 let err = AgentStreamEvent::Error {
                     message: format!("Invalid message: {}", e),
                 };
-                let _ = socket.send(WsMessage::Text(
-                    serde_json::to_string(&err).unwrap_or_default().into(),
-                )).await;
+                let _ = socket
+                    .send(WsMessage::Text(
+                        serde_json::to_string(&err).unwrap_or_default().into(),
+                    ))
+                    .await;
                 continue;
             }
         };
@@ -531,9 +542,11 @@ async fn handle_ws_connection(mut socket: WebSocket, state: SharedApiState) {
             let err = AgentStreamEvent::Error {
                 message: format!("Unknown message type: '{}'", client_msg.msg_type),
             };
-            let _ = socket.send(WsMessage::Text(
-                serde_json::to_string(&err).unwrap_or_default().into(),
-            )).await;
+            let _ = socket
+                .send(WsMessage::Text(
+                    serde_json::to_string(&err).unwrap_or_default().into(),
+                ))
+                .await;
             continue;
         }
 
@@ -559,7 +572,10 @@ async fn handle_ws_connection(mut socket: WebSocket, state: SharedApiState) {
         let mut conv_clone = conv.clone();
         drop(conversations);
 
-        match agent.run_stream(&client_msg.content, &mut conv_clone, &[], &[]).await {
+        match agent
+            .run_stream(&client_msg.content, &mut conv_clone, &[], &[])
+            .await
+        {
             Ok(mut rx) => {
                 while let Some(event) = rx.recv().await {
                     let json = serde_json::to_string(&event).unwrap_or_default();
@@ -572,9 +588,11 @@ async fn handle_ws_connection(mut socket: WebSocket, state: SharedApiState) {
                 let err = AgentStreamEvent::Error {
                     message: format!("Agent error: {}", e),
                 };
-                let _ = socket.send(WsMessage::Text(
-                    serde_json::to_string(&err).unwrap_or_default().into(),
-                )).await;
+                let _ = socket
+                    .send(WsMessage::Text(
+                        serde_json::to_string(&err).unwrap_or_default().into(),
+                    ))
+                    .await;
             }
         }
     }
@@ -595,12 +613,16 @@ async fn log_stream_handler(
         .map(|event| {
             let data = serde_json::to_string(event.as_ref()).unwrap_or_default();
             let event_name = match event.as_ref() {
-                rustedclaw_core::event::DomainEvent::ResponseGenerated { .. } => "response_generated",
+                rustedclaw_core::event::DomainEvent::ResponseGenerated { .. } => {
+                    "response_generated"
+                }
                 rustedclaw_core::event::DomainEvent::ToolExecuted { .. } => "tool_executed",
                 rustedclaw_core::event::DomainEvent::MemoryAccessed { .. } => "memory_accessed",
                 rustedclaw_core::event::DomainEvent::MessageReceived { .. } => "message_received",
                 rustedclaw_core::event::DomainEvent::ErrorOccurred { .. } => "error_occurred",
-                rustedclaw_core::event::DomainEvent::AgentStateChanged { .. } => "agent_state_changed",
+                rustedclaw_core::event::DomainEvent::AgentStateChanged { .. } => {
+                    "agent_state_changed"
+                }
             };
             Ok(SseEvent::default().event(event_name).data(data))
         });
@@ -638,11 +660,7 @@ async fn create_conversation_handler(
     let id = conv.id.to_string();
     let created = conv.created_at.to_rfc3339();
 
-    state
-        .conversations
-        .write()
-        .await
-        .insert(id.clone(), conv);
+    state.conversations.write().await.insert(id.clone(), conv);
 
     (
         StatusCode::CREATED,
@@ -679,9 +697,7 @@ async fn get_conversation_handler(
     }))
 }
 
-async fn list_tools_handler(
-    State(state): State<SharedApiState>,
-) -> Json<ToolListResponse> {
+async fn list_tools_handler(State(state): State<SharedApiState>) -> Json<ToolListResponse> {
     let defs = state.tools.definitions();
     let count = defs.len();
 
@@ -864,7 +880,10 @@ struct RoutineActionResponse {
 async fn list_routines_handler(
     State(state): State<SharedApiState>,
 ) -> Result<Json<RoutineListResponse>, StatusCode> {
-    let engine = state.workflow.as_ref().ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+    let engine = state
+        .workflow
+        .as_ref()
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
     let tasks = engine.list_tasks().await;
 
     let routines: Vec<RoutineDto> = tasks
@@ -965,7 +984,10 @@ async fn update_routine_handler(
             engine.remove_task(&id).await;
             let updated = rustedclaw_workflow::CronTask {
                 schedule: req.schedule.unwrap_or(existing.schedule),
-                instruction: req.instruction.clone().unwrap_or(existing.instruction.clone()),
+                instruction: req
+                    .instruction
+                    .clone()
+                    .unwrap_or(existing.instruction.clone()),
                 target_channel: req.target_channel.unwrap_or(existing.target_channel),
                 action: if let Some(ref instr) = req.instruction {
                     rustedclaw_workflow::TaskAction::AgentTask {
@@ -1092,7 +1114,9 @@ async fn ingest_document_handler(
     Json(req): Json<IngestDocumentRequest>,
 ) -> (StatusCode, Json<IngestDocumentResponse>) {
     let id = uuid::Uuid::new_v4().to_string();
-    let document_id = req.document_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let document_id = req
+        .document_id
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let chunk_index = req.chunk_index.unwrap_or(0);
 
     let entry = DocumentEntry {
@@ -1107,12 +1131,15 @@ async fn ingest_document_handler(
 
     state.documents.write().await.push(entry);
 
-    (StatusCode::CREATED, Json(IngestDocumentResponse {
-        id,
-        document_id,
-        chunk_index,
-        source: req.source,
-    }))
+    (
+        StatusCode::CREATED,
+        Json(IngestDocumentResponse {
+            id,
+            document_id,
+            chunk_index,
+            source: req.source,
+        }),
+    )
 }
 
 // ── Memory CRUD ───────────────────────────────────────────────────────────
@@ -1191,16 +1218,17 @@ async fn create_memory_handler(
 
     state.memories.write().await.push(entry);
 
-    (StatusCode::CREATED, Json(CreateMemoryResponse {
-        id,
-        content: req.content,
-        created_at: now.to_rfc3339(),
-    }))
+    (
+        StatusCode::CREATED,
+        Json(CreateMemoryResponse {
+            id,
+            content: req.content,
+            created_at: now.to_rfc3339(),
+        }),
+    )
 }
 
-async fn search_memory_handler(
-    State(state): State<SharedApiState>,
-) -> Json<MemoryListResponse> {
+async fn search_memory_handler(State(state): State<SharedApiState>) -> Json<MemoryListResponse> {
     let memories = state.memories.read().await;
     let items: Vec<MemoryItemDto> = memories
         .iter()
@@ -1214,7 +1242,10 @@ async fn search_memory_handler(
         })
         .collect();
     let count = items.len();
-    Json(MemoryListResponse { memories: items, count })
+    Json(MemoryListResponse {
+        memories: items,
+        count,
+    })
 }
 
 async fn list_agent_memory_handler(
@@ -1225,7 +1256,9 @@ async fn list_agent_memory_handler(
     let tag_filter = format!("agent:{agent_id}");
     let items: Vec<MemoryItemDto> = memories
         .iter()
-        .filter(|m| m.tags.iter().any(|t| t == &tag_filter) || m.source.as_deref() == Some(&agent_id))
+        .filter(|m| {
+            m.tags.iter().any(|t| t == &tag_filter) || m.source.as_deref() == Some(&agent_id)
+        })
         .map(|m| MemoryItemDto {
             id: m.id.clone(),
             content: m.content.clone(),
@@ -1236,7 +1269,10 @@ async fn list_agent_memory_handler(
         })
         .collect();
     let count = items.len();
-    Json(MemoryListResponse { memories: items, count })
+    Json(MemoryListResponse {
+        memories: items,
+        count,
+    })
 }
 
 async fn delete_memory_handler(
@@ -1252,10 +1288,13 @@ async fn delete_memory_handler(
             message: format!("Memory '{id}' deleted"),
         }))
     } else {
-        Err((StatusCode::NOT_FOUND, Json(MemoryDeleteResponse {
-            success: false,
-            message: format!("Memory '{id}' not found"),
-        })))
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(MemoryDeleteResponse {
+                success: false,
+                message: format!("Memory '{id}' not found"),
+            }),
+        ))
     }
 }
 
@@ -1267,12 +1306,13 @@ struct JobListResponse {
     count: usize,
 }
 
-async fn list_jobs_handler(
-    State(state): State<SharedApiState>,
-) -> Json<JobListResponse> {
+async fn list_jobs_handler(State(state): State<SharedApiState>) -> Json<JobListResponse> {
     let jobs = state.jobs.read().await;
     let count = jobs.len();
-    Json(JobListResponse { jobs: jobs.clone(), count })
+    Json(JobListResponse {
+        jobs: jobs.clone(),
+        count,
+    })
 }
 
 async fn get_job_handler(
@@ -1293,9 +1333,11 @@ async fn get_job_handler(
 struct InstallToolRequest {
     name: String,
     #[serde(default)]
+    #[allow(dead_code)]
     description: Option<String>,
     /// Base64-encoded WASM binary
     #[serde(default)]
+    #[allow(dead_code)]
     wasm_base64: Option<String>,
 }
 
@@ -1311,16 +1353,25 @@ async fn install_tool_handler(
 ) -> Result<(StatusCode, Json<InstallToolResponse>), (StatusCode, Json<ErrorResponse>)> {
     // Stub: accept the request, validate the name, return success
     if req.name.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, Json(ErrorResponse {
-            error: "Tool name is required".into(),
-        })));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Tool name is required".into(),
+            }),
+        ));
     }
 
-    Ok((StatusCode::CREATED, Json(InstallToolResponse {
-        success: true,
-        name: req.name.clone(),
-        message: format!("Tool '{}' registered (stub — WASM validation not yet wired)", req.name),
-    })))
+    Ok((
+        StatusCode::CREATED,
+        Json(InstallToolResponse {
+            success: true,
+            name: req.name.clone(),
+            message: format!(
+                "Tool '{}' registered (stub — WASM validation not yet wired)",
+                req.name
+            ),
+        }),
+    ))
 }
 
 // ── Channel endpoints ─────────────────────────────────────────────────────
@@ -1345,9 +1396,7 @@ struct ChannelTestResponse {
     message: String,
 }
 
-async fn list_channels_handler(
-    State(state): State<SharedApiState>,
-) -> Json<ChannelListResponse> {
+async fn list_channels_handler(State(state): State<SharedApiState>) -> Json<ChannelListResponse> {
     let config = state.config.read().await;
     let mut channels = Vec::new();
 
@@ -1357,7 +1406,11 @@ async fn list_channels_handler(
             name: name.clone(),
             enabled: ch.enabled,
             connected: ch.enabled, // Stub: assume connected if enabled
-            health: if ch.enabled { "healthy".into() } else { "disabled".into() },
+            health: if ch.enabled {
+                "healthy".into()
+            } else {
+                "disabled".into()
+            },
         });
     }
 
@@ -1387,27 +1440,27 @@ async fn test_channel_handler(
     }
 
     match config.channels_config.get(&name) {
-        Some(ch) if ch.enabled => {
-            Ok(Json(ChannelTestResponse {
-                channel: name,
-                success: true,
-                message: "Channel connection test passed (stub)".into(),
-            }))
-        }
-        Some(_) => {
-            Err((StatusCode::BAD_REQUEST, Json(ChannelTestResponse {
+        Some(ch) if ch.enabled => Ok(Json(ChannelTestResponse {
+            channel: name,
+            success: true,
+            message: "Channel connection test passed (stub)".into(),
+        })),
+        Some(_) => Err((
+            StatusCode::BAD_REQUEST,
+            Json(ChannelTestResponse {
                 channel: name,
                 success: false,
                 message: "Channel is disabled".into(),
-            })))
-        }
-        None => {
-            Err((StatusCode::NOT_FOUND, Json(ChannelTestResponse {
+            }),
+        )),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Json(ChannelTestResponse {
                 channel: name,
                 success: false,
                 message: "Channel not found".into(),
-            })))
-        }
+            }),
+        )),
     }
 }
 
@@ -1424,9 +1477,7 @@ struct ConfigUpdateResponse {
     message: String,
 }
 
-async fn get_config_handler(
-    State(state): State<SharedApiState>,
-) -> Json<ConfigResponse> {
+async fn get_config_handler(State(state): State<SharedApiState>) -> Json<ConfigResponse> {
     let config = state.config.read().await;
     let mut value = serde_json::to_value(&*config).unwrap_or(serde_json::json!({}));
 
@@ -1468,9 +1519,12 @@ async fn update_config_handler(
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<ConfigUpdateResponse>, (StatusCode, Json<ErrorResponse>)> {
     if !payload.is_object() {
-        return Err((StatusCode::BAD_REQUEST, Json(ErrorResponse {
-            error: "Request body must be a JSON object".into(),
-        })));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Request body must be a JSON object".into(),
+            }),
+        ));
     }
 
     // Merge partial update into current config
@@ -1486,16 +1540,19 @@ async fn update_config_handler(
                 message: "Configuration updated".into(),
             }))
         }
-        Err(e) => {
-            Err((StatusCode::BAD_REQUEST, Json(ErrorResponse {
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
                 error: format!("Invalid config update: {e}"),
-            })))
-        }
+            }),
+        )),
     }
 }
 
 fn merge_json(base: &mut serde_json::Value, patch: &serde_json::Value) {
-    if let (serde_json::Value::Object(base_map), serde_json::Value::Object(patch_map)) = (base, patch) {
+    if let (serde_json::Value::Object(base_map), serde_json::Value::Object(patch_map)) =
+        (base, patch)
+    {
         for (key, value) in patch_map {
             if value.is_object() && base_map.get(key).is_some_and(|v| v.is_object()) {
                 merge_json(base_map.get_mut(key).unwrap(), value);
@@ -1521,9 +1578,7 @@ struct StatusResponse {
     workflow_engine: bool,
 }
 
-async fn status_handler(
-    State(state): State<SharedApiState>,
-) -> Json<StatusResponse> {
+async fn status_handler(State(state): State<SharedApiState>) -> Json<StatusResponse> {
     let conversations = state.conversations.read().await;
     let memories = state.memories.read().await;
     let documents = state.documents.read().await;
@@ -1967,7 +2022,7 @@ mod tests {
         let app = v1_router(state.clone());
         let req = Request::builder()
             .method("DELETE")
-            .uri(&format!("/memory/{}", created.id))
+            .uri(format!("/memory/{}", created.id))
             .body(Body::empty())
             .unwrap();
 
@@ -2036,10 +2091,7 @@ mod tests {
     async fn list_jobs_empty() {
         let app = v1_router(test_api_state());
 
-        let req = Request::builder()
-            .uri("/jobs")
-            .body(Body::empty())
-            .unwrap();
+        let req = Request::builder().uri("/jobs").body(Body::empty()).unwrap();
 
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -2229,8 +2281,11 @@ mod tests {
         // Read the body — should contain SSE events
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let text = String::from_utf8_lossy(&body);
-        assert!(text.contains("event: chunk") || text.contains("event: done"),
-            "SSE body should contain chunk or done events, got: {}", text);
+        assert!(
+            text.contains("event: chunk") || text.contains("event: done"),
+            "SSE body should contain chunk or done events, got: {}",
+            text
+        );
     }
 
     #[tokio::test]
@@ -2256,7 +2311,11 @@ mod tests {
         let text = String::from_utf8_lossy(&body);
 
         // Must always end with a done event
-        assert!(text.contains("event: done"), "Missing done event in SSE stream: {}", text);
+        assert!(
+            text.contains("event: done"),
+            "Missing done event in SSE stream: {}",
+            text
+        );
     }
 
     #[tokio::test]
@@ -2265,10 +2324,7 @@ mod tests {
         // the route exists and returns the right response for a non-upgrade request
         let app = v1_router(test_api_state());
 
-        let req = Request::builder()
-            .uri("/ws")
-            .body(Body::empty())
-            .unwrap();
+        let req = Request::builder().uri("/ws").body(Body::empty()).unwrap();
 
         let response = app.oneshot(req).await.unwrap();
         // Without proper upgrade headers, axum returns 405 or similar
@@ -2280,10 +2336,7 @@ mod tests {
     async fn log_stream_returns_sse() {
         let app = v1_router(test_api_state());
 
-        let req = Request::builder()
-            .uri("/logs")
-            .body(Body::empty())
-            .unwrap();
+        let req = Request::builder().uri("/logs").body(Body::empty()).unwrap();
 
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);

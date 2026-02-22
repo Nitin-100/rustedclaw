@@ -19,9 +19,7 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AgentStreamEvent {
     /// Partial text token from the LLM.
-    Chunk {
-        content: String,
-    },
+    Chunk { content: String },
 
     /// The agent is calling a tool.
     ToolCall {
@@ -39,9 +37,7 @@ pub enum AgentStreamEvent {
     },
 
     /// A thought / reasoning step (ReAct trace).
-    Thought {
-        content: String,
-    },
+    Thought { content: String },
 
     /// The stream is complete — final metadata.
     Done {
@@ -52,9 +48,7 @@ pub enum AgentStreamEvent {
     },
 
     /// An error occurred mid-stream.
-    Error {
-        message: String,
-    },
+    Error { message: String },
 }
 
 impl AgentStreamEvent {
@@ -125,12 +119,56 @@ mod tests {
 
     #[test]
     fn event_type_names() {
-        assert_eq!(AgentStreamEvent::Chunk { content: "x".into() }.event_type(), "chunk");
-        assert_eq!(AgentStreamEvent::ToolCall { id: "a".into(), name: "b".into(), input: serde_json::Value::Null }.event_type(), "tool_call");
-        assert_eq!(AgentStreamEvent::ToolResult { id: "a".into(), name: "b".into(), output: "c".into(), success: true }.event_type(), "tool_result");
-        assert_eq!(AgentStreamEvent::Thought { content: "x".into() }.event_type(), "thought");
-        assert_eq!(AgentStreamEvent::Done { conversation_id: "x".into(), usage: None, iterations: 0, tool_calls_made: 0 }.event_type(), "done");
-        assert_eq!(AgentStreamEvent::Error { message: "x".into() }.event_type(), "error");
+        assert_eq!(
+            AgentStreamEvent::Chunk {
+                content: "x".into()
+            }
+            .event_type(),
+            "chunk"
+        );
+        assert_eq!(
+            AgentStreamEvent::ToolCall {
+                id: "a".into(),
+                name: "b".into(),
+                input: serde_json::Value::Null
+            }
+            .event_type(),
+            "tool_call"
+        );
+        assert_eq!(
+            AgentStreamEvent::ToolResult {
+                id: "a".into(),
+                name: "b".into(),
+                output: "c".into(),
+                success: true
+            }
+            .event_type(),
+            "tool_result"
+        );
+        assert_eq!(
+            AgentStreamEvent::Thought {
+                content: "x".into()
+            }
+            .event_type(),
+            "thought"
+        );
+        assert_eq!(
+            AgentStreamEvent::Done {
+                conversation_id: "x".into(),
+                usage: None,
+                iterations: 0,
+                tool_calls_made: 0
+            }
+            .event_type(),
+            "done"
+        );
+        assert_eq!(
+            AgentStreamEvent::Error {
+                message: "x".into()
+            }
+            .event_type(),
+            "error"
+        );
     }
 
     #[test]

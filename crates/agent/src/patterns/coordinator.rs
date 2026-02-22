@@ -20,13 +20,13 @@
 //! └──────┘ └──────┘
 //! ```
 
-use std::sync::Arc;
 use rustedclaw_core::event::EventBus;
 use rustedclaw_core::identity::Identity;
 use rustedclaw_core::memory::MemoryEntry;
 use rustedclaw_core::message::{Conversation, Message};
 use rustedclaw_core::provider::{Provider, ProviderRequest};
 use rustedclaw_core::tool::ToolRegistry;
+use std::sync::Arc;
 use tracing::{debug, info};
 
 use crate::context::working_memory::{TraceEntry, WorkingMemory};
@@ -203,9 +203,7 @@ impl CoordinatorAgent {
             .with_max_iterations(5);
 
             let mut worker_conv = Conversation::new();
-            let result = worker
-                .run(task, &mut worker_conv, memories, &[])
-                .await?;
+            let result = worker.run(task, &mut worker_conv, memories, &[]).await?;
 
             coordinator_wm.add_observation(&format!(
                 "{} completed: {}",
@@ -242,9 +240,7 @@ impl CoordinatorAgent {
 
         info!(
             sub_tasks = sub_results.len(),
-            total_iterations,
-            total_tool_calls,
-            "Coordinator: complete"
+            total_iterations, total_tool_calls, "Coordinator: complete"
         );
 
         Ok(CoordinationResult {
@@ -389,7 +385,9 @@ mod tests {
             make_text_response("researcher: Research Rust performance\nwriter: Write a summary"),
             make_text_response("Rust has zero-cost abstractions and no GC."),
             make_text_response("Rust is a fast, safe systems language."),
-            make_text_response("Rust combines performance with safety through its ownership system."),
+            make_text_response(
+                "Rust combines performance with safety through its ownership system.",
+            ),
         ]));
 
         let tools = Arc::new(rustedclaw_tools::default_registry());
@@ -465,10 +463,7 @@ mod tests {
             event_bus,
         );
 
-        let result = coordinator
-            .run("Simple question", &[])
-            .await
-            .unwrap();
+        let result = coordinator.run("Simple question", &[]).await.unwrap();
 
         assert_eq!(result.sub_results.len(), 1);
         assert_eq!(result.sub_results[0].worker_name, "default");
