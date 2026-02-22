@@ -309,7 +309,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p bench-results
-          cat > bench-results/${{ matrix.name }}.json << EOF
+          cat > "bench-results/${{ matrix.name }}.json" << EOF
           {
             "platform": "${{ matrix.name }}",
             "runner": "${{ matrix.os }}",
