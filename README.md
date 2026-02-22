@@ -17,6 +17,31 @@
 
 ---
 
+## 🧪 Benchmarks
+
+All numbers independently verified on constrained Docker containers simulating low-end hardware.
+Test host: i7-12700F, 32 GB RAM, NVMe — numbers below are **not** host numbers.
+
+| Metric | Raspberry Pi (1 CPU, 256 MB) | $5 VPS (1 CPU, 512 MB) | $10 VPS (2 CPU, 1 GB) |
+|---|:---:|:---:|:---:|
+| **Idle RAM** | 996 KiB | 996 KiB | 1004 KiB |
+| **After 500 req** | 1.05 MiB | 1.02 MiB | 1.03 MiB |
+| **After 2500 concurrent** | 1.17 MiB | 1.28 MiB | 1.29 MiB |
+| **After 50 chat POSTs** | 1.16 MiB | 1.28 MiB | 1.29 MiB |
+| **Failure rate** | 0 / 3000+ | 0 / 1500+ | 0 / 1500+ |
+| **Sequential throughput** | 169 req/s | 198 req/s | 207 req/s |
+
+**Machine-independent metrics:**
+- Binary size: **3.94 MB** (release, stripped, LTO)
+- Docker image: **44 MB** (distroless runtime)
+- Threads: **6** (Tokio worker_threads=2 + runtime)
+- Container cold start: **~350 ms** (includes Docker overhead)
+- Native cold start: **5.4 ms** average (i7-12700F + NVMe)
+
+> RAM growth after thousands of requests: **< 0.3 MB**. No leaks detected.
+
+---
+
 ## 🌍 The Landscape
 
 There are several open-source AI agent runtimes. Here's how they compare:
@@ -191,30 +216,7 @@ GET  /v1/logs                   SSE log stream
 
 ---
 
-## 🧪 Benchmarks
-
-All numbers independently verified on constrained Docker containers simulating low-end hardware.
-Test host: i7-12700F, 32 GB RAM, NVMe — numbers below are **not** host numbers.
-
-| Metric | Raspberry Pi (1 CPU, 256 MB) | $5 VPS (1 CPU, 512 MB) | $10 VPS (2 CPU, 1 GB) |
-|---|:---:|:---:|:---:|
-| **Idle RAM** | 996 KiB | 996 KiB | 1004 KiB |
-| **After 500 req** | 1.05 MiB | 1.02 MiB | 1.03 MiB |
-| **After 2500 concurrent** | 1.17 MiB | 1.28 MiB | 1.29 MiB |
-| **After 50 chat POSTs** | 1.16 MiB | 1.28 MiB | 1.29 MiB |
-| **Failure rate** | 0 / 3000+ | 0 / 1500+ | 0 / 1500+ |
-| **Sequential throughput** | 169 req/s | 198 req/s | 207 req/s |
-
-**Machine-independent metrics:**
-- Binary size: **3.94 MB** (release, stripped, LTO)
-- Docker image: **44 MB** (distroless runtime)
-- Threads: **6** (Tokio worker_threads=2 + runtime)
-- Container cold start: **~350 ms** (includes Docker overhead)
-- Native cold start: **5.4 ms** average (i7-12700F + NVMe)
-
-> RAM growth after thousands of requests: **< 0.3 MB**. No leaks detected.
-
-Run the included scripts to verify on your own hardware:
+## 🔬 Verify It Yourself
 
 ```powershell
 # Windows — simulates 3 low-end tiers via Docker
