@@ -27,6 +27,7 @@ use rustedclaw_contracts::ContractEngine;
 use rustedclaw_core::event::EventBus;
 use rustedclaw_core::identity::{ContextPaths, Identity};
 use rustedclaw_core::message::{Conversation, Message};
+use rustedclaw_telemetry::TelemetryEngine;
 
 /// Shared application state for the gateway.
 pub struct GatewayState {
@@ -125,6 +126,42 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
         Arc::new(ContractEngine::new(contract_set).expect("invalid contract configuration"))
     };
 
+    // Build telemetry engine with built-in pricing + configured budgets
+    let telemetry_engine = {
+        let engine = TelemetryEngine::new();
+        // Apply budgets from config
+        for budget_cfg in &config.telemetry.budgets {
+            let scope = match budget_cfg.scope.as_str() {
+                "per_request" => rustedclaw_telemetry::BudgetScope::PerRequest,
+                "per_session" => rustedclaw_telemetry::BudgetScope::PerSession,
+                "daily" => rustedclaw_telemetry::BudgetScope::Daily,
+                "monthly" => rustedclaw_telemetry::BudgetScope::Monthly,
+                _ => rustedclaw_telemetry::BudgetScope::Total,
+            };
+            let action = match budget_cfg.on_exceed.as_str() {
+                "warn" => rustedclaw_telemetry::BudgetAction::Warn,
+                _ => rustedclaw_telemetry::BudgetAction::Deny,
+            };
+            engine.add_budget(rustedclaw_telemetry::Budget {
+                scope,
+                max_usd: budget_cfg.max_usd,
+                max_tokens: budget_cfg.max_tokens,
+                on_exceed: action,
+            });
+        }
+        // Apply custom pricing overrides
+        for (model, pricing_cfg) in &config.telemetry.custom_pricing {
+            engine.pricing().set(
+                model.clone(),
+                rustedclaw_telemetry::pricing::ModelPricing::new(
+                    pricing_cfg.input_per_m,
+                    pricing_cfg.output_per_m,
+                ),
+            );
+        }
+        Arc::new(engine)
+    };
+
     // Shared agent for legacy routes (reuses same provider/tools/identity)
     let agent = Arc::new(
         AgentLoop::new(
@@ -136,7 +173,8 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
             event_bus.clone(),
         )
         .with_max_tokens(config.default_max_tokens)
-        .with_contracts(contract_engine.clone()),
+        .with_contracts(contract_engine.clone())
+        .with_telemetry(telemetry_engine.clone()),
     );
 
     // Build shared state for legacy routes.
@@ -156,6 +194,7 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
         identity,
         event_bus,
         contracts: contract_engine,
+        telemetry: telemetry_engine,
         conversations: RwLock::new(HashMap::new()),
         workflow: Some(Arc::new(rustedclaw_workflow::WorkflowEngine::new(
             config.heartbeat.enabled,

@@ -64,6 +64,15 @@ pub enum DomainEvent {
         message: String,
         timestamp: DateTime<Utc>,
     },
+
+    /// A spending budget was exceeded or nearly exceeded
+    BudgetExceeded {
+        scope: String,
+        spent_usd: f64,
+        limit_usd: f64,
+        action: String,
+        timestamp: DateTime<Utc>,
+    },
 }
 
 /// A broadcast-based event bus for domain events.

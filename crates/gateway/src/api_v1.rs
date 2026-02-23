@@ -41,6 +41,7 @@ use rustedclaw_core::memory::MemoryEntry;
 use rustedclaw_core::message::{Conversation, ConversationId, Message};
 use rustedclaw_core::provider::Provider;
 use rustedclaw_core::tool::ToolRegistry;
+use rustedclaw_telemetry::TelemetryEngine;
 
 // ── State ─────────────────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ pub struct ApiV1State {
     pub identity: Identity,
     pub event_bus: Arc<EventBus>,
     pub contracts: Arc<ContractEngine>,
+    pub telemetry: Arc<TelemetryEngine>,
     pub conversations: RwLock<HashMap<String, Conversation>>,
     pub workflow: Option<Arc<rustedclaw_workflow::WorkflowEngine>>,
     pub config: RwLock<rustedclaw_config::AppConfig>,
@@ -102,6 +104,15 @@ pub fn v1_router(state: SharedApiState) -> Router {
         .route(
             "/contracts/{name}",
             axum::routing::delete(delete_contract_handler),
+        )
+        .route("/usage", get(usage_handler))
+        .route("/traces", get(list_traces_handler))
+        .route("/traces/{id}", get(get_trace_handler))
+        .route("/budgets", get(list_budgets_handler))
+        .route("/budgets", post(add_budget_handler))
+        .route(
+            "/budgets/{scope}",
+            axum::routing::delete(delete_budget_handler),
         )
         .route("/status", get(status_handler))
         .with_state(state)
@@ -634,6 +645,7 @@ async fn log_stream_handler(
                 rustedclaw_core::event::DomainEvent::ContractViolation { .. } => {
                     "contract_violation"
                 }
+                rustedclaw_core::event::DomainEvent::BudgetExceeded { .. } => "budget_exceeded",
             };
             Ok(SseEvent::default().event(event_name).data(data))
         });
@@ -1674,6 +1686,151 @@ async fn delete_contract_handler(
     }
 }
 
+// ── Telemetry / Usage / Budgets ───────────────────────────────────────────
+
+async fn usage_handler(
+    State(state): State<SharedApiState>,
+) -> Json<rustedclaw_telemetry::UsageSnapshot> {
+    Json(state.telemetry.usage_snapshot())
+}
+
+#[derive(Serialize, Deserialize)]
+struct TraceListResponse {
+    count: usize,
+    traces: Vec<TraceSummaryDto>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TraceSummaryDto {
+    id: String,
+    conversation_id: String,
+    spans: usize,
+    total_cost_usd: f64,
+    total_tokens: u32,
+    started_at: String,
+    ended: bool,
+}
+
+async fn list_traces_handler(State(state): State<SharedApiState>) -> Json<TraceListResponse> {
+    let traces = state.telemetry.recent_traces(50);
+    let dtos: Vec<TraceSummaryDto> = traces
+        .iter()
+        .map(|t| TraceSummaryDto {
+            id: t.id.clone(),
+            conversation_id: t.conversation_id.clone(),
+            spans: t.spans.len(),
+            total_cost_usd: t.total_cost(),
+            total_tokens: t.total_tokens(),
+            started_at: t.started_at.to_rfc3339(),
+            ended: t.ended_at.is_some(),
+        })
+        .collect();
+    Json(TraceListResponse {
+        count: dtos.len(),
+        traces: dtos,
+    })
+}
+
+async fn get_trace_handler(
+    State(state): State<SharedApiState>,
+    Path(id): Path<String>,
+) -> Result<Json<rustedclaw_telemetry::Trace>, StatusCode> {
+    state
+        .telemetry
+        .get_trace(&id)
+        .map(Json)
+        .ok_or(StatusCode::NOT_FOUND)
+}
+
+#[derive(Serialize, Deserialize)]
+struct BudgetListResponse {
+    count: usize,
+    budgets: Vec<BudgetDto>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct BudgetDto {
+    scope: String,
+    max_usd: f64,
+    max_tokens: u64,
+    on_exceed: String,
+}
+
+async fn list_budgets_handler(State(state): State<SharedApiState>) -> Json<BudgetListResponse> {
+    let budgets = state.telemetry.list_budgets();
+    let dtos: Vec<BudgetDto> = budgets
+        .iter()
+        .map(|b| BudgetDto {
+            scope: b.scope.to_string(),
+            max_usd: b.max_usd,
+            max_tokens: b.max_tokens,
+            on_exceed: format!("{:?}", b.on_exceed),
+        })
+        .collect();
+    Json(BudgetListResponse {
+        count: dtos.len(),
+        budgets: dtos,
+    })
+}
+
+#[derive(Deserialize)]
+struct AddBudgetRequest {
+    scope: String,
+    max_usd: f64,
+    #[serde(default)]
+    max_tokens: u64,
+    #[serde(default = "default_on_exceed")]
+    on_exceed: String,
+}
+
+fn default_on_exceed() -> String {
+    "deny".into()
+}
+
+async fn add_budget_handler(
+    State(state): State<SharedApiState>,
+    Json(req): Json<AddBudgetRequest>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let scope = match req.scope.as_str() {
+        "per_request" => rustedclaw_telemetry::BudgetScope::PerRequest,
+        "per_session" => rustedclaw_telemetry::BudgetScope::PerSession,
+        "daily" => rustedclaw_telemetry::BudgetScope::Daily,
+        "monthly" => rustedclaw_telemetry::BudgetScope::Monthly,
+        "total" => rustedclaw_telemetry::BudgetScope::Total,
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+    let action = match req.on_exceed.as_str() {
+        "warn" => rustedclaw_telemetry::BudgetAction::Warn,
+        _ => rustedclaw_telemetry::BudgetAction::Deny,
+    };
+    state.telemetry.add_budget(rustedclaw_telemetry::Budget {
+        scope,
+        max_usd: req.max_usd,
+        max_tokens: req.max_tokens,
+        on_exceed: action,
+    });
+    Ok(Json(serde_json::json!({ "added": req.scope })))
+}
+
+async fn delete_budget_handler(
+    State(state): State<SharedApiState>,
+    Path(scope): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let scope_enum = match scope.as_str() {
+        "per_request" => rustedclaw_telemetry::BudgetScope::PerRequest,
+        "per_session" => rustedclaw_telemetry::BudgetScope::PerSession,
+        "daily" => rustedclaw_telemetry::BudgetScope::Daily,
+        "monthly" => rustedclaw_telemetry::BudgetScope::Monthly,
+        "total" => rustedclaw_telemetry::BudgetScope::Total,
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+    if state.telemetry.remove_budget(&scope_enum) {
+        Ok(Json(serde_json::json!({ "removed": scope })))
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
+}
+
 // ── Status ────────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize)]
@@ -1686,6 +1843,8 @@ struct StatusResponse {
     document_entries: usize,
     tools_count: usize,
     contracts_count: usize,
+    session_cost_usd: f64,
+    trace_count: usize,
     provider: String,
     workflow_engine: bool,
 }
@@ -1708,6 +1867,8 @@ async fn status_handler(State(state): State<SharedApiState>) -> Json<StatusRespo
         document_entries: documents.len(),
         tools_count: state.tools.definitions().len(),
         contracts_count: state.contracts.active_count(),
+        session_cost_usd: state.telemetry.usage_snapshot().session_cost_usd,
+        trace_count: state.telemetry.trace_count(),
         provider: state.provider.name().into(),
         workflow_engine: state.workflow.is_some(),
     })
@@ -1776,6 +1937,7 @@ mod tests {
             identity,
             event_bus,
             contracts: Arc::new(rustedclaw_contracts::ContractEngine::empty()),
+            telemetry: Arc::new(rustedclaw_telemetry::TelemetryEngine::new()),
             conversations: RwLock::new(HashMap::new()),
             workflow: Some(Arc::new(rustedclaw_workflow::WorkflowEngine::default())),
             config: RwLock::new(rustedclaw_config::AppConfig::default()),

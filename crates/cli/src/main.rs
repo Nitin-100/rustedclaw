@@ -123,6 +123,12 @@ enum Commands {
         action: ContractAction,
     },
 
+    /// Usage, cost tracking, and budget management
+    Usage {
+        #[command(subcommand)]
+        action: UsageAction,
+    },
+
     /// List supported LLM providers and aliases
     Providers,
 
@@ -201,6 +207,27 @@ enum ContractAction {
     },
 }
 
+#[derive(Subcommand)]
+enum UsageAction {
+    /// Show current usage snapshot (costs, tokens, budgets)
+    Show,
+    /// List available model pricing
+    Pricing,
+    /// Show configured budgets
+    Budgets,
+    /// Estimate cost for a model and token count
+    Estimate {
+        /// Model name (e.g. "anthropic/claude-sonnet-4")
+        model: String,
+        /// Input tokens
+        #[arg(short, long, default_value = "1000")]
+        input_tokens: u32,
+        /// Output tokens
+        #[arg(short, long, default_value = "500")]
+        output_tokens: u32,
+    },
+}
+
 #[derive(Clone, clap::ValueEnum)]
 enum MigrateSource {
     /// Migrate from OpenClaw
@@ -275,6 +302,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ContractAction::List => commands::contract::list().await?,
             ContractAction::Validate => commands::contract::validate().await?,
             ContractAction::Test { tool, args } => commands::contract::test(&tool, &args).await?,
+        },
+
+        Commands::Usage { action } => match action {
+            UsageAction::Show => commands::usage::usage().await?,
+            UsageAction::Pricing => commands::usage::pricing().await?,
+            UsageAction::Budgets => commands::usage::budgets().await?,
+            UsageAction::Estimate {
+                model,
+                input_tokens,
+                output_tokens,
+            } => commands::usage::estimate(&model, input_tokens, output_tokens).await?,
         },
 
         Commands::Providers => commands::providers::run().await?,

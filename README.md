@@ -5,7 +5,7 @@
 <h1 align="center">RustedClaw</h1>
 
 <p align="center">
-  <strong>The lightest AI agent runtime you can self-host.<br>~6.6 MB RAM. 4.06 MB binary. Zero runtime dependencies. Zero sign-ups. Zero lock-in.</strong>
+  <strong>The lightest AI agent runtime you can self-host.<br>~6.7 MB RAM. 4.16 MB binary. Zero runtime dependencies. Zero sign-ups. Zero lock-in.</strong>
 </p>
 
 <p align="center">
@@ -13,7 +13,7 @@
   <a href="https://github.com/Nitin-100/rustedclaw/actions/workflows/bench.yml"><img src="https://github.com/Nitin-100/rustedclaw/actions/workflows/bench.yml/badge.svg" alt="Benchmarks"></a>
   <a href="#-quick-start"><img src="https://img.shields.io/badge/get_started-2_min-brightgreen?style=for-the-badge" alt="Get Started"></a>
   <a href="#-benchmarks"><img src="https://img.shields.io/badge/RAM-6.6_MB-critical?style=for-the-badge" alt="RAM"></a>
-  <a href="#-benchmarks"><img src="https://img.shields.io/badge/binary-4.06_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>
+  <a href="#-benchmarks"><img src="https://img.shields.io/badge/binary-4.16_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
 </p>
 
@@ -74,19 +74,19 @@ All numbers measured locally on i7-12700F, 32 GB RAM, Windows 11, NVMe. Reproduc
 
 | Metric | Native (i7-12700F) | Docker “Raspberry Pi” (1 CPU, 256 MB) | Docker “$5 VPS” (1 CPU, 512 MB) | Docker “$10 VPS” (2 CPU, 1 GB) |
 |---|:---:|:---:|:---:|:---:|
-| **Idle RAM** | 6.63 MB | 1.07 MiB¹ | 1.08 MiB¹ | 1.07 MiB¹ |
-| **Post-load RAM** | 6.88 MB | 1.10 MiB¹ | 1.09 MiB¹ | 1.11 MiB¹ |
-| **Peak RAM (concurrent)** | 6.95 MB | 1.25 MiB¹ | 1.25 MiB¹ | 1.25 MiB¹ |
-| **Throughput (seq)** | 4,098 req/s | 1,838 req/s | 1,779 req/s | 1,916 req/s |
-| **Throughput (5× parallel)** | — | 888 req/s | 1,002 req/s | 1,018 req/s |
+| **Idle RAM** | 6.71 MB | 1.09 MiB¹ | 1.10 MiB¹ | 1.09 MiB¹ |
+| **Post-load RAM** | 6.95 MB | 1.13 MiB¹ | 1.11 MiB¹ | 1.12 MiB¹ |
+| **Peak RAM (concurrent)** | 7.03 MB | 1.29 MiB¹ | 1.28 MiB¹ | 1.27 MiB¹ |
+| **Throughput (seq)** | 4,049 req/s | 1,799 req/s | 1,786 req/s | 1,754 req/s |
+| **Throughput (5× parallel)** | — | 786 req/s | 973 req/s | 977 req/s |
 | **RAM growth after 6K req** | 0.32 MB | — | — | — |
 
 <sub>¹ Docker cgroup-constrained RSS — the kernel reclaims pages under memory pressure, so reported RSS is lower than on bare metal. Unconstrained native RSS is ~6.6 MB.</sub>
 
 **Machine-independent metrics:**
-- Binary size: **4.06 MB** (release, stripped, `opt-level="z"`, LTO)
+- Binary size: **4.16 MB** (release, stripped, `opt-level="z"`, LTO)
 - Threads: **6** (Tokio `worker_threads=2` + runtime)
-- Cold start: **5 ms** P50, **5.9 ms** avg (i7-12700F + NVMe — expect 15–30 ms on a VPS)
+- Cold start: **5 ms** P50, **12.8 ms** avg (i7-12700F + NVMe — expect 15–30 ms on a VPS)
 
 > RAM growth after 6,000+ requests: **0.32 MB**. No leaks detected.
 
@@ -101,11 +101,11 @@ There are several open-source AI agent runtimes. Here's how they compare:
 | **Language** | Rust | Zig | Rust | Rust | Rust + JS |
 | **Account Required** | **No** ✅ | **No** ✅ | **No** ✅ | **Yes** ❌ (NEAR AI) | **No** ✅ |
 | **External Deps** | **None** | **None** | **None** | PostgreSQL + pgvector | Node 18 + npm |
-| **Binary Size** | **4.06 MB** | **678 KB** 👑 | 8.8 MB | ~15 MB + Postgres | ~300 MB (node_modules) |
-| **Idle RAM** | **6.6 MB** | **~1 MB** 👑 | ~8–12 MB¹ | ~50+ MB² | ~1.2 GB |
-| **Peak RAM** | **6.95 MB** | — | not published | — | — |
+| **Binary Size** | **4.16 MB** | **678 KB** 👑 | 8.8 MB | ~15 MB + Postgres | ~300 MB (node_modules) |
+| **Idle RAM** | **6.7 MB** | **~1 MB** 👑 | ~8–12 MB¹ | ~50+ MB² | ~1.2 GB |
+| **Peak RAM** | **7.03 MB** | — | not published | — | — |
 | **Cold Start** | **5 ms** | **<2 ms** 👑 | ~20 ms¹ | ~2 s² | ~4 s |
-| **Tests** | **440** | 2843 | not published | not published | not published |
+| **Tests** | **469** | 2843 | not published | not published | not published |
 | **Providers** | 11 | 22+ | 28+ | NEAR AI only | varies |
 | **Channels** | 6 | 13 | 17 | HTTP only | HTTP + WS |
 | **Web UI** | ✅ Embedded | ❌ | ✅ | ✅ | ✅ |
@@ -124,12 +124,12 @@ There are several open-source AI agent runtimes. Here's how they compare:
 |---|---|
 | NEAR AI account (IronClaw) | **No account** — bring any API key |
 | PostgreSQL + pgvector (IronClaw) | **No external deps** — single binary |
-| 300 MB node_modules (OpenClaw) | **4.06 MB** — smaller than a JPEG |
-| 1.2 GB idle RAM (OpenClaw) | **6.6 MB** — less than your shell |
+| 300 MB node_modules (OpenClaw) | **4.16 MB** — smaller than a JPEG |
+| 1.2 GB idle RAM (OpenClaw) | **6.7 MB** — less than your shell |
 | No Web UI (nullclaw) | **Built-in Web UI** — 7-page SPA |
 | No memory/search (nullclaw) | **SQLite + FTS5** — full-text search |
 
-> **nullclaw** is smaller (Zig). **ZeroClaw** has more providers. But nothing else matches 6.6 MB RAM + Web UI + 4 agent patterns + agent contracts + memory + zero runtime deps in a single binary.
+> **nullclaw** is smaller (Zig). **ZeroClaw** has more providers. But nothing else matches 6.7 MB RAM + Web UI + 4 agent patterns + agent contracts + cost tracking + memory + zero runtime deps in a single binary.
 
 ---
 
@@ -197,6 +197,7 @@ Open **http://localhost:42617** — done. Chat away.
 | **Streaming** | Real SSE for chat, logs, and events |
 | **Security** | Path validation, command sandboxing, WASM tool isolation, configurable autonomy levels |
 | **Agent Contracts** | Declarative behavior guardrails — deny, confirm, warn, or allow tool calls via TOML rules |
+| **Cost Tracking & Budgets** | Real-time token cost tracking, per-model pricing for 20+ models, daily/monthly/per-request budget limits |
 | **Channels** | CLI, HTTP webhook, WebSocket, Telegram, Slack, Discord |
 | **Pairing** | Optional device-pairing for secure remote access |
 | **Migration** | Import data from OpenClaw with `rustedclaw migrate openclaw` |
@@ -229,6 +230,10 @@ rustedclaw memory clear         Clear all memories
 rustedclaw contract list        List configured contracts
 rustedclaw contract validate    Validate contract definitions
 rustedclaw contract test <tool> <args>  Test a contract against a tool call
+rustedclaw usage show           Show cost/token usage snapshot
+rustedclaw usage pricing        List model pricing table (20+ models)
+rustedclaw usage budgets        Show configured budgets
+rustedclaw usage estimate <model> [-i tokens] [-o tokens]  Estimate cost
 rustedclaw migrate openclaw     Import from OpenClaw
 rustedclaw estop [--resume]     Emergency stop / resume
 rustedclaw completions <shell>  Generate shell completions
@@ -273,6 +278,25 @@ trigger = "tool:shell"
 condition = 'args.command CONTAINS "rm -rf"'
 action = "deny"
 message = "Blocked: rm -rf is forbidden"
+
+# ── Cost Tracking & Budgets (optional) ──────────────────
+[telemetry]
+enabled = true
+
+[[telemetry.budgets]]
+scope = "daily"            # per_request | per_session | daily | monthly | total
+max_usd = 5.00             # max spend in USD
+on_exceed = "deny"         # deny | warn
+
+[[telemetry.budgets]]
+scope = "per_request"
+max_usd = 0.50
+on_exceed = "deny"
+
+# Custom pricing overrides (built-in pricing for 20+ models)
+# [telemetry.custom_pricing."my-provider/my-model"]
+# input_per_m = 1.0
+# output_per_m = 3.0
 ```
 
 **Environment variables** override the config file (no file editing needed):
@@ -308,6 +332,12 @@ GET  /v1/config                 Runtime config
 GET  /v1/contracts              List agent contracts
 POST /v1/contracts              Add a contract at runtime
 DELETE /v1/contracts/:name      Remove a contract
+GET  /v1/usage                  Real-time cost & token snapshot
+GET  /v1/traces                 List recent execution traces
+GET  /v1/traces/:id             Get detailed trace with spans
+GET  /v1/budgets                List configured budgets
+POST /v1/budgets                Add a spending budget
+DELETE /v1/budgets/:scope       Remove a budget
 GET  /v1/jobs                   List background jobs
 GET  /v1/logs                   SSE log stream
 ```
@@ -366,6 +396,39 @@ rustedclaw contract test shell '{"command":"rm -rf /"}'  # Simulate
 
 ---
 
+## 💰 Cost Tracking & Budgets
+
+Real-time token cost tracking with built-in pricing for 20+ models and budget enforcement that stops runaway API spend.
+
+**Built-in pricing** for Anthropic (Claude 4 Opus/Sonnet, 3.5 Sonnet/Haiku), OpenAI (GPT-4o, o1, o3-mini), Google (Gemini 2.0/1.5), Meta (Llama 3.1), Mistral, DeepSeek — or add custom pricing in config.
+
+**Budget scopes**: `per_request`, `per_session`, `daily`, `monthly`, `total`
+
+**Budget actions**: `deny` (block the LLM call) or `warn` (log and allow)
+
+```toml
+# In ~/.rustedclaw/config.toml
+[[telemetry.budgets]]
+scope = "daily"
+max_usd = 5.00
+on_exceed = "deny"     # Block calls when daily spend exceeds $5
+```
+
+```bash
+rustedclaw usage show                             # Cost snapshot
+rustedclaw usage pricing                          # Model pricing table
+rustedclaw usage estimate anthropic/claude-sonnet-4 -i 1000 -o 500  # Estimate cost
+```
+
+Every LLM call and tool execution is traced as a **span** — grouped into **traces** per conversation turn. Query via REST API:
+
+```
+GET /v1/usage    →  { session_cost_usd, daily_cost_usd, budgets: [...] }
+GET /v1/traces   →  [{ id, spans, total_cost_usd, total_tokens }]
+```
+
+---
+
 ## 🔬 Verify It Yourself
 
 ```powershell
@@ -394,6 +457,7 @@ rustedclaw/
 │   ├── agent/       # ReAct, RAG, Coordinator        (62 tests)
 │   ├── gateway/     # Axum HTTP + SSE + WS           (32 tests)
 │   ├── contracts/   # Agent behavior contracts        (33 tests)
+│   ├── telemetry/   # Cost tracking, tracing, budgets (29 tests)
 │   ├── workflow/    # Cron engine                    (16 tests)
 │   ├── security/    # Sandboxing + WASM              (40 tests)
 │   └── cli/         # Binary entry point + commands   (6 + 17 e2e tests)
@@ -401,7 +465,7 @@ rustedclaw/
 ├── scripts/         # Benchmark scripts
 ├── Dockerfile
 ├── docker-compose.yml
-└── 440 tests, 0 failures
+└── 469 tests, 0 failures
 ```
 
 ---

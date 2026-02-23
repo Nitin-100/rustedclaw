@@ -12,6 +12,7 @@ members = [
     "crates/workflow",
     "crates/security",
     "crates/contracts",
+    "crates/telemetry",
     "crates/cli",
 ]
 
@@ -82,6 +83,7 @@ rustedclaw-gateway = { path = "crates/gateway" }
 rustedclaw-workflow = { path = "crates/workflow" }
 rustedclaw-security = { path = "crates/security" }
 rustedclaw-contracts = { path = "crates/contracts" }
+rustedclaw-telemetry = { path = "crates/telemetry" }
 
 [profile.release]
 opt-level = "z"

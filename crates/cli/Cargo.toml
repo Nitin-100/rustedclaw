@@ -20,6 +20,7 @@ rustedclaw-agent = { workspace = true }
 rustedclaw-gateway = { workspace = true }
 rustedclaw-workflow = { workspace = true }
 rustedclaw-contracts = { workspace = true }
+rustedclaw-telemetry = { workspace = true }
 clap = { workspace = true }
 clap_complete = "4"
 tokio = { workspace = true }
