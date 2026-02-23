@@ -5,15 +5,15 @@
 <h1 align="center">RustedClaw</h1>
 
 <p align="center">
-  <strong>The lightest AI agent runtime you can self-host.<br>~6 MB RAM. < 4 MB binary. Zero runtime dependencies. Zero sign-ups. Zero lock-in.</strong>
+  <strong>The lightest AI agent runtime you can self-host.<br>~6.6 MB RAM. 3.94 MB binary. Zero runtime dependencies. Zero sign-ups. Zero lock-in.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/Nitin-100/rustedclaw/actions/workflows/ci.yml"><img src="https://github.com/Nitin-100/rustedclaw/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Nitin-100/rustedclaw/actions/workflows/bench.yml"><img src="https://github.com/Nitin-100/rustedclaw/actions/workflows/bench.yml/badge.svg" alt="Benchmarks"></a>
   <a href="#-quick-start"><img src="https://img.shields.io/badge/get_started-2_min-brightgreen?style=for-the-badge" alt="Get Started"></a>
-  <a href="#-benchmarks"><img src="https://img.shields.io/badge/RAM-~6_MB-critical?style=for-the-badge" alt="RAM"></a>
-  <a href="#-benchmarks"><img src="https://img.shields.io/badge/binary-<_4_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>
+  <a href="#-benchmarks"><img src="https://img.shields.io/badge/RAM-6.6_MB-critical?style=for-the-badge" alt="RAM"></a>
+  <a href="#-benchmarks"><img src="https://img.shields.io/badge/binary-3.94_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
 </p>
 
@@ -42,8 +42,8 @@ Most AI agent runtimes want you to sign up, install databases, pull 300 MB of no
 <td width="33%" align="center">
 
 **🪶 Absurdly Light**<br>
-~6 MB RSS idle. < 7 MB peak under<br>
-2,500 concurrent requests.<br>
+6.6 MB idle. 6.9 MB peak under<br>
+6,000+ requests. 5 ms cold start.<br>
 Your <em>terminal emulator</em> uses more.
 
 </td>
@@ -70,25 +70,25 @@ Not a toy — a runtime.
 
 ## 🧪 Benchmarks
 
-All numbers from CI and local benchmarks. Docker rows use `--memory` cgroup limits.
-Test host: i7-12700F, 32 GB RAM, Windows 11 — Linux/macOS from GitHub Actions runners.
+All numbers measured locally on i7-12700F, 32 GB RAM, Windows 11, NVMe. Reproduce: `scripts\benchmark_lowend.ps1`.
 
-| Metric | Native (Windows, i7-12700F) | Docker (1 CPU, 256 MB) | Docker (1 CPU, 512 MB) | Docker (2 CPU, 1 GB) |
+| Metric | Native (i7-12700F) | Docker “Raspberry Pi” (1 CPU, 256 MB) | Docker “$5 VPS” (1 CPU, 512 MB) | Docker “$10 VPS” (2 CPU, 1 GB) |
 |---|:---:|:---:|:---:|:---:|
-| **Idle RAM** | 6.3 MiB | 996 KiB¹ | 996 KiB¹ | 1004 KiB¹ |
-| **Peak RAM** | 6.9 MiB | 1.28 MiB¹ | 1.28 MiB¹ | 1.29 MiB¹ |
-| **Throughput** | 900 req/s | 169 req/s | 198 req/s | 207 req/s |
-| **Failure rate** | 0 / 2000+ | 0 / 3000+ | 0 / 1500+ | 0 / 1500+ |
+| **Idle RAM** | 6.57 MB | 1.02 MiB¹ | 1.03 MiB¹ | 1.03 MiB¹ |
+| **Post-load RAM** | 6.86 MB | 1.06 MiB¹ | 1.04 MiB¹ | 1.06 MiB¹ |
+| **Peak RAM (concurrent)** | — | 1.20 MiB¹ | 1.18 MiB¹ | 1.17 MiB¹ |
+| **Throughput (seq)** | 4,098 req/s | 1,767 req/s | 1,645 req/s | 1,916 req/s |
+| **Throughput (5× parallel)** | — | 703 req/s | 1,027 req/s | 1,025 req/s |
+| **RAM growth after 6K req** | 0.29 MB | — | — | — |
 
-<sub>¹ Docker cgroup-constrained RSS — the kernel reclaims pages under memory pressure, so reported RSS is lower than unconstrained. Real idle RSS without cgroup limits is ~6 MB.</sub>
+<sub>¹ Docker cgroup-constrained RSS — the kernel reclaims pages under memory pressure, so reported RSS is lower than on bare metal. Unconstrained native RSS is ~6.6 MB.</sub>
 
 **Machine-independent metrics:**
-- Binary size: **~3.7 MB** (release, stripped, LTO — varies by platform)
-- Docker image: **44 MB** (distroless runtime)
-- Threads: **6** (Tokio worker_threads=2 + runtime)
-- Cold start: **53 ms** (native, Windows) / **~350 ms** (Docker, includes container overhead)
+- Binary size: **3.94 MB** (release, stripped, `opt-level="z"`, LTO)
+- Threads: **6** (Tokio `worker_threads=2` + runtime)
+- Cold start: **5 ms** P50, **11 ms** avg (i7-12700F + NVMe — expect 15–30 ms on a VPS)
 
-> RAM growth after thousands of requests: **< 1 MB**. No leaks detected.
+> RAM growth after 6,000+ requests: **0.29 MB**. No leaks detected.
 
 ---
 
@@ -101,10 +101,10 @@ There are several open-source AI agent runtimes. Here's how they compare:
 | **Language** | Rust | Zig | Rust | Rust | Rust + JS |
 | **Account Required** | **No** ✅ | **No** ✅ | **No** ✅ | **Yes** ❌ (NEAR AI) | **No** ✅ |
 | **External Deps** | **None** | **None** | **None** | PostgreSQL + pgvector | Node 18 + npm |
-| **Binary Size** | **~3.7 MB** | **678 KB** 👑 | 8.8 MB | ~15 MB + Postgres | ~300 MB (node_modules) |
-| **Idle RAM** | **~6 MB** | **~1 MB** 👑 | ~8–12 MB¹ | ~50+ MB² | ~1.2 GB |
-| **Peak RAM** | **~7 MB** (2.5K burst) | — | not published | — | — |
-| **Cold Start** | **53 ms** | **<2 ms** 👑 | ~20 ms¹ | ~2 s² | ~4 s |
+| **Binary Size** | **3.94 MB** | **678 KB** 👑 | 8.8 MB | ~15 MB + Postgres | ~300 MB (node_modules) |
+| **Idle RAM** | **6.6 MB** | **~1 MB** 👑 | ~8–12 MB¹ | ~50+ MB² | ~1.2 GB |
+| **Peak RAM** | **6.9 MB** | — | not published | — | — |
+| **Cold Start** | **5 ms** | **<2 ms** 👑 | ~20 ms¹ | ~2 s² | ~4 s |
 | **Tests** | **407** | 2843 | not published | not published | not published |
 | **Providers** | 11 | 22+ | 28+ | NEAR AI only | varies |
 | **Channels** | 6 | 13 | 17 | HTTP only | HTTP + WS |
@@ -124,12 +124,12 @@ There are several open-source AI agent runtimes. Here's how they compare:
 |---|---|
 | NEAR AI account (IronClaw) | **No account** — bring any API key |
 | PostgreSQL + pgvector (IronClaw) | **No external deps** — single binary |
-| 300 MB node_modules (OpenClaw) | **~3.7 MB** — smaller than a JPEG |
-| 1.2 GB idle RAM (OpenClaw) | **~6 MB** — less than your shell |
+| 300 MB node_modules (OpenClaw) | **3.94 MB** — smaller than a JPEG |
+| 1.2 GB idle RAM (OpenClaw) | **6.6 MB** — less than your shell |
 | No Web UI (nullclaw) | **Built-in Web UI** — 7-page SPA |
 | No memory/search (nullclaw) | **SQLite + FTS5** — full-text search |
 
-> **nullclaw** is smaller (Zig). **ZeroClaw** has more providers. But nothing else matches ~6 MB RAM + Web UI + 4 agent patterns + memory + zero runtime deps in a single binary.
+> **nullclaw** is smaller (Zig). **ZeroClaw** has more providers. But nothing else matches 6.6 MB RAM + Web UI + 4 agent patterns + memory + zero runtime deps in a single binary.
 
 ---
 
