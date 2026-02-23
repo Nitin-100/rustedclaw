@@ -300,7 +300,8 @@ async fn chat_handler(
                 state.tools.clone(),
                 state.identity.clone(),
                 state.event_bus.clone(),
-            );
+            )
+            .with_telemetry(state.telemetry.clone());
 
             // Release the lock before the async LLM call.
             // We need to clone the conversation for the agent.
@@ -481,7 +482,8 @@ async fn chat_stream_handler(
         state.tools.clone(),
         state.identity.clone(),
         state.event_bus.clone(),
-    );
+    )
+    .with_telemetry(state.telemetry.clone());
 
     let mut conv_clone = conv.clone();
     drop(conversations);
@@ -586,7 +588,8 @@ async fn handle_ws_connection(mut socket: WebSocket, state: SharedApiState) {
             state.tools.clone(),
             state.identity.clone(),
             state.event_bus.clone(),
-        );
+        )
+        .with_telemetry(state.telemetry.clone());
 
         let mut conv_clone = conv.clone();
         drop(conversations);

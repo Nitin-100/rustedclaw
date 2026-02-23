@@ -135,10 +135,58 @@ impl PricingTable {
     }
 
     /// Compute cost for a model call, returning 0.0 if model is not in table.
+    ///
+    /// Supports flexible matching: tries exact match first, then strips
+    /// provider prefix (`openai/gpt-4o` → `gpt-4o`), then tries prefix
+    /// matching (`gpt-4o-mini-2024-07-18` matches `gpt-4o-mini`).
     pub fn compute_cost(&self, model: &str, input_tokens: u32, output_tokens: u32) -> f64 {
-        self.get(model)
-            .map(|p| p.cost(input_tokens, output_tokens))
-            .unwrap_or(0.0)
+        let prices = self.prices.read().unwrap();
+
+        // 1. Exact match
+        if let Some(p) = prices.get(model) {
+            return p.cost(input_tokens, output_tokens);
+        }
+
+        // 2. Try with common provider prefixes
+        let prefixed_names = [
+            format!("openai/{}", model),
+            format!("anthropic/{}", model),
+            format!("google/{}", model),
+            format!("mistral/{}", model),
+            format!("deepseek/{}", model),
+            format!("meta-llama/{}", model),
+        ];
+        for name in &prefixed_names {
+            if let Some(p) = prices.get(name.as_str()) {
+                return p.cost(input_tokens, output_tokens);
+            }
+        }
+
+        // 3. Prefix match — model response often includes version suffix
+        //    e.g. "gpt-4o-mini-2024-07-18" should match "gpt-4o-mini"
+        //    or "openai/gpt-4o-mini"
+        let model_lower = model.to_lowercase();
+        let bare_model = model_lower
+            .split('/')
+            .last()
+            .unwrap_or(&model_lower);
+
+        // Find the longest matching key whose bare name is a prefix of the model
+        let mut best: Option<(&str, &ModelPricing)> = None;
+        for (key, pricing) in prices.iter() {
+            let bare_key = key.split('/').last().unwrap_or(key);
+            if bare_model.starts_with(&bare_key.to_lowercase()) {
+                if best.is_none() || bare_key.len() > best.unwrap().0.len() {
+                    best = Some((key.as_str(), pricing));
+                }
+            }
+        }
+
+        if let Some((_, p)) = best {
+            return p.cost(input_tokens, output_tokens);
+        }
+
+        0.0
     }
 
     /// List all known model names.
