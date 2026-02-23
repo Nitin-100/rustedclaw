@@ -22,7 +22,7 @@
 //! value    = QUOTED_STRING | NUMBER
 //! ```
 
-use regex::Regex;
+use regex_lite::Regex;
 
 /// A parsed condition tree.
 #[derive(Debug, Clone)]
@@ -118,15 +118,15 @@ impl Atom {
                 .is_none_or(|fv| !fv.contains(self.value.as_str())),
             Op::Matches => {
                 let pattern = self.value.as_str();
-                field_value.as_deref().is_some_and(|fv| {
-                    Regex::new(pattern).is_ok_and(|re| re.is_match(fv))
-                })
+                field_value
+                    .as_deref()
+                    .is_some_and(|fv| Regex::new(pattern).is_ok_and(|re| re.is_match(fv)))
             }
             Op::NotMatches => {
                 let pattern = self.value.as_str();
-                field_value.as_deref().is_none_or(|fv| {
-                    Regex::new(pattern).is_ok_and(|re| !re.is_match(fv))
-                })
+                field_value
+                    .as_deref()
+                    .is_none_or(|fv| Regex::new(pattern).is_ok_and(|re| !re.is_match(fv)))
             }
             Op::StartsWith => field_value
                 .as_deref()
@@ -142,12 +142,16 @@ impl Atom {
                 .is_none_or(|fv| !fv.ends_with(self.value.as_str())),
             Op::Eq => match (&field_value, &self.value) {
                 (Some(fv), Value::Str(s)) => fv == s,
-                (Some(fv), Value::Num(n)) => fv.parse::<f64>().is_ok_and(|x| (x - n).abs() < f64::EPSILON),
+                (Some(fv), Value::Num(n)) => fv
+                    .parse::<f64>()
+                    .is_ok_and(|x| (x - n).abs() < f64::EPSILON),
                 (None, _) => false,
             },
             Op::NotEq => match (&field_value, &self.value) {
                 (Some(fv), Value::Str(s)) => fv != s,
-                (Some(fv), Value::Num(n)) => fv.parse::<f64>().is_ok_and(|x| (x - n).abs() >= f64::EPSILON),
+                (Some(fv), Value::Num(n)) => fv
+                    .parse::<f64>()
+                    .is_ok_and(|x| (x - n).abs() >= f64::EPSILON),
                 (None, _) => true,
             },
             Op::Gt => self.compare_num(&field_value, |a, b| a > b),
@@ -441,10 +445,7 @@ fn parse_field(tokens: &[Token]) -> Result<(Field, &[Token]), String> {
             };
             Ok((field, &tokens[1..]))
         }
-        _ => Err(format!(
-            "expected field name, got {:?}",
-            tokens.first()
-        )),
+        _ => Err(format!("expected field name, got {:?}", tokens.first())),
     }
 }
 
@@ -478,10 +479,7 @@ fn parse_base_op(tokens: &[Token]) -> Result<(Op, &[Token]), String> {
         Some(Token::Lt) => Ok((Op::Lt, &tokens[1..])),
         Some(Token::Gte) => Ok((Op::Gte, &tokens[1..])),
         Some(Token::Lte) => Ok((Op::Lte, &tokens[1..])),
-        _ => Err(format!(
-            "expected operator, got {:?}",
-            tokens.first()
-        )),
+        _ => Err(format!("expected operator, got {:?}", tokens.first())),
     }
 }
 
@@ -557,10 +555,8 @@ mod tests {
 
     #[test]
     fn parse_or_expression() {
-        let cond = parse_condition(
-            r#"args.command CONTAINS "rm" OR args.command CONTAINS "del""#,
-        )
-        .unwrap();
+        let cond = parse_condition(r#"args.command CONTAINS "rm" OR args.command CONTAINS "del""#)
+            .unwrap();
         let ctx = ctx_with_args(serde_json::json!({"command": "del file.txt"}));
         assert!(cond.evaluate(&ctx));
 

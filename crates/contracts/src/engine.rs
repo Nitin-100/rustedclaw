@@ -109,11 +109,7 @@ impl ContractEngine {
     ///
     /// Returns the verdict for the highest-priority matching contract,
     /// or `Verdict::allow()` if no contracts match.
-    pub fn check_tool_call(
-        &self,
-        tool_name: &str,
-        arguments: &serde_json::Value,
-    ) -> Verdict {
+    pub fn check_tool_call(&self, tool_name: &str, arguments: &serde_json::Value) -> Verdict {
         let trigger = Trigger::Tool(tool_name.to_string());
         let ctx = EvalContext {
             args: Some(arguments),
@@ -174,10 +170,7 @@ impl ContractEngine {
     pub fn remove_contract(&self, name: &str) -> bool {
         let removed = self.contracts.write().unwrap().remove(name);
         if removed {
-            self.conditions
-                .write()
-                .unwrap()
-                .retain(|(n, _)| n != name);
+            self.conditions.write().unwrap().retain(|(n, _)| n != name);
         }
         removed
     }
@@ -343,10 +336,7 @@ priority = 100
     #[test]
     fn deny_rm_rf() {
         let engine = ContractEngine::new(test_contracts()).unwrap();
-        let verdict = engine.check_tool_call(
-            "shell",
-            &serde_json::json!({"command": "rm -rf /"}),
-        );
+        let verdict = engine.check_tool_call("shell", &serde_json::json!({"command": "rm -rf /"}));
         assert!(!verdict.allowed);
         assert_eq!(verdict.action, Action::Deny);
         assert_eq!(verdict.contract_name.as_deref(), Some("no-rm-rf"));
@@ -355,10 +345,7 @@ priority = 100
     #[test]
     fn allow_safe_shell() {
         let engine = ContractEngine::new(test_contracts()).unwrap();
-        let verdict = engine.check_tool_call(
-            "shell",
-            &serde_json::json!({"command": "ls -la"}),
-        );
+        let verdict = engine.check_tool_call("shell", &serde_json::json!({"command": "ls -la"}));
         assert!(verdict.allowed);
         assert_eq!(verdict.action, Action::Allow);
         assert!(verdict.contract_name.is_none());
@@ -411,8 +398,7 @@ priority = 100
     #[test]
     fn deny_password_in_response() {
         let engine = ContractEngine::new(test_contracts()).unwrap();
-        let verdict =
-            engine.check_response("Here is your password and API key: sk-abc123");
+        let verdict = engine.check_response("Here is your password and API key: sk-abc123");
         assert!(!verdict.allowed);
         assert_eq!(verdict.contract_name.as_deref(), Some("no-password-leak"));
     }
@@ -439,10 +425,7 @@ priority = 100
     #[test]
     fn empty_engine_allows_all() {
         let engine = ContractEngine::empty();
-        let verdict = engine.check_tool_call(
-            "shell",
-            &serde_json::json!({"command": "rm -rf /"}),
-        );
+        let verdict = engine.check_tool_call("shell", &serde_json::json!({"command": "rm -rf /"}));
         assert!(verdict.allowed);
         assert_eq!(engine.active_count(), 0);
     }
@@ -497,10 +480,8 @@ priority = 100
         let engine = ContractEngine::new(set).unwrap();
 
         // "dangerous" matches the high-priority deny contract.
-        let verdict = engine.check_tool_call(
-            "shell",
-            &serde_json::json!({"command": "dangerous stuff"}),
-        );
+        let verdict =
+            engine.check_tool_call("shell", &serde_json::json!({"command": "dangerous stuff"}));
         assert!(!verdict.allowed);
         assert_eq!(verdict.contract_name.as_deref(), Some("high-priority-deny"));
     }

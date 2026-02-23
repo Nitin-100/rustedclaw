@@ -274,9 +274,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Contract { action } => match action {
             ContractAction::List => commands::contract::list().await?,
             ContractAction::Validate => commands::contract::validate().await?,
-            ContractAction::Test { tool, args } => {
-                commands::contract::test(&tool, &args).await?
-            }
+            ContractAction::Test { tool, args } => commands::contract::test(&tool, &args).await?,
         },
 
         Commands::Providers => commands::providers::run().await?,

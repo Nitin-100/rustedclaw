@@ -79,10 +79,7 @@ pub async fn validate() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Test a contract against a simulated tool call.
-pub async fn test(
-    tool: &str,
-    args_json: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn test(tool: &str, args_json: &str) -> Result<(), Box<dyn std::error::Error>> {
     let config = AppConfig::load()?;
     let contracts = build_contracts(&config);
 

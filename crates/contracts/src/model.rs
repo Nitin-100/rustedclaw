@@ -146,13 +146,13 @@ impl Trigger {
     }
 
     fn validate(&self, contract_name: &str) -> Result<(), crate::ContractError> {
-        if let Trigger::Tool(name) = self {
-            if name.is_empty() {
-                return Err(crate::ContractError::InvalidContract {
-                    name: contract_name.into(),
-                    reason: "tool trigger name cannot be empty".into(),
-                });
-            }
+        if let Trigger::Tool(name) = self
+            && name.is_empty()
+        {
+            return Err(crate::ContractError::InvalidContract {
+                name: contract_name.into(),
+                reason: "tool trigger name cannot be empty".into(),
+            });
         }
         Ok(())
     }
@@ -208,9 +208,17 @@ mod tests {
 
     #[test]
     fn trigger_from_string() {
-        assert!(matches!(Trigger::from(String::from("tool:shell")), Trigger::Tool(n) if n == "shell"));
-        assert!(matches!(Trigger::from(String::from("tool:*")), Trigger::AnyTool));
-        assert!(matches!(Trigger::from(String::from("response")), Trigger::Response));
+        assert!(
+            matches!(Trigger::from(String::from("tool:shell")), Trigger::Tool(n) if n == "shell")
+        );
+        assert!(matches!(
+            Trigger::from(String::from("tool:*")),
+            Trigger::AnyTool
+        ));
+        assert!(matches!(
+            Trigger::from(String::from("response")),
+            Trigger::Response
+        ));
         assert!(matches!(Trigger::from(String::from("*")), Trigger::Any));
         assert!(matches!(Trigger::from(String::from("any")), Trigger::Any));
         assert!(matches!(Trigger::from(String::from("shell")), Trigger::Tool(n) if n == "shell"));

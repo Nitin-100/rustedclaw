@@ -122,10 +122,7 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
                 priority: cc.priority,
             });
         }
-        Arc::new(
-            ContractEngine::new(contract_set)
-                .expect("invalid contract configuration"),
-        )
+        Arc::new(ContractEngine::new(contract_set).expect("invalid contract configuration"))
     };
 
     // Shared agent for legacy routes (reuses same provider/tools/identity)

@@ -1,13 +1,13 @@
 //! The agent reasoning loop implementation.
 
 use chrono::Utc;
+use rustedclaw_contracts::ContractEngine;
 use rustedclaw_core::event::{DomainEvent, EventBus};
 use rustedclaw_core::identity::Identity;
 use rustedclaw_core::memory::{MemoryBackend, MemoryEntry, MemoryQuery, SearchMode};
 use rustedclaw_core::message::{Conversation, Message};
 use rustedclaw_core::provider::{Provider, ProviderRequest};
 use rustedclaw_core::tool::{ToolCall, ToolRegistry};
-use rustedclaw_contracts::ContractEngine;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -347,10 +347,7 @@ impl AgentLoop {
                             timestamp: chrono::Utc::now(),
                         });
 
-                        let blocked_msg = format!(
-                            "🛑 Contract violation: {}",
-                            verdict.message
-                        );
+                        let blocked_msg = format!("🛑 Contract violation: {}", verdict.message);
                         warn!(
                             tool = %call.name,
                             contract = ?verdict.contract_name,
