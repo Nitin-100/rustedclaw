@@ -9,11 +9,46 @@ use rustedclaw_core::identity::{ContextPaths, Identity};
 use rustedclaw_core::message::{Conversation, Message};
 use std::sync::Arc;
 
-pub async fn run(message: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
-    let config = AppConfig::load().map_err(|e| format!("Failed to load config: {e}"))?;
+pub async fn run(
+    message: Option<String>,
+    local: bool,
+    model_override: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut config = AppConfig::load().map_err(|e| format!("Failed to load config: {e}"))?;
 
-    // Check for API key early — give a clear error
-    if config.api_key.is_none() {
+    // If --local is set, override provider to "local" (no API key needed)
+    if local {
+        let model = model_override
+            .clone()
+            .unwrap_or_else(|| "tinyllama".to_string());
+
+        config.default_provider = "local".to_string();
+        config.default_model = model.clone();
+
+        // Ensure we have a provider entry for "local"
+        config.providers.insert(
+            "local".to_string(),
+            rustedclaw_config::ProviderConfig {
+                api_key: None,
+                api_url: Some("local://candle".to_string()),
+                default_model: Some(model),
+            },
+        );
+
+        eprintln!();
+        eprintln!("  ⚡ Local Inference Mode (Candle)");
+        eprintln!("  Model:   {}", config.default_model);
+        eprintln!("  Engine:  Candle (Rust-native ML)");
+        eprintln!("  API Key: not required");
+        eprintln!("  Network: not required");
+        eprintln!();
+    } else if let Some(ref m) = model_override {
+        // --model without --local: just override the model name
+        config.default_model = m.clone();
+    }
+
+    // Check for API key — but skip for local provider
+    if !local && config.api_key.is_none() {
         eprintln!();
         eprintln!("  ERROR: No API key configured!");
         eprintln!();
@@ -29,6 +64,8 @@ pub async fn run(message: Option<String>) -> Result<(), Box<dyn std::error::Erro
         );
         eprintln!();
         eprintln!("  Get an OpenRouter key at: https://openrouter.ai/keys");
+        eprintln!();
+        eprintln!("  TIP: For zero-API-key usage, try: rustedclaw agent --local --model tinyllama");
         eprintln!();
         return Err("No API key found. See above for setup instructions.".into());
     }
@@ -101,6 +138,10 @@ pub async fn run(message: Option<String>) -> Result<(), Box<dyn std::error::Erro
         println!();
         println!("  Provider:  {}", config.default_provider);
         println!("  Model:     {}", config.default_model);
+        if local {
+            println!("  Engine:    Candle (Rust-native, in-process)");
+            println!("  Network:   OFFLINE — zero API calls");
+        }
         println!("  Tools:     shell, file_read, file_write");
         println!(
             "  Context:   {} files loaded (~{} tokens)",

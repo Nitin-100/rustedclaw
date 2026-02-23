@@ -1,0 +1,182 @@
+name: Release Builds
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── Standard builds ──────────────────────────────────
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            features: ""
+            binary: rustedclaw
+            archive: rustedclaw-linux-x86_64.tar.gz
+
+          - name: linux-arm64
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            features: ""
+            binary: rustedclaw
+            archive: rustedclaw-linux-arm64.tar.gz
+            cross: true
+
+          - name: macos-x86_64
+            os: macos-13
+            target: x86_64-apple-darwin
+            features: ""
+            binary: rustedclaw
+            archive: rustedclaw-macos-x86_64.tar.gz
+
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            features: ""
+            binary: rustedclaw
+            archive: rustedclaw-macos-arm64.tar.gz
+
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            features: ""
+            binary: rustedclaw.exe
+            archive: rustedclaw-windows-x86_64.zip
+
+          # ── Local inference builds ───────────────────────────
+          - name: linux-x86_64-local
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            features: "local"
+            binary: rustedclaw
+            archive: rustedclaw-linux-x86_64-local.tar.gz
+
+          - name: macos-arm64-local
+            os: macos-latest
+            target: aarch64-apple-darwin
+            features: "local"
+            binary: rustedclaw
+            archive: rustedclaw-macos-arm64-local.tar.gz
+
+          - name: windows-x86_64-local
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            features: "local"
+            binary: rustedclaw.exe
+            archive: rustedclaw-windows-x86_64-local.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross (ARM64 Linux)
+        if: matrix.cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.name }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ matrix.name }}-cargo-
+
+      - name: Build (native)
+        if: "!matrix.cross"
+        run: |
+          FEATURES="${{ matrix.features }}"
+          if [ -n "$FEATURES" ]; then
+            cargo build --release --target ${{ matrix.target }} --features "$FEATURES"
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+        shell: bash
+
+      - name: Build (cross)
+        if: matrix.cross
+        run: |
+          FEATURES="${{ matrix.features }}"
+          if [ -n "$FEATURES" ]; then
+            cross build --release --target ${{ matrix.target }} --features "$FEATURES"
+          else
+            cross build --release --target ${{ matrix.target }}
+          fi
+        shell: bash
+
+      - name: Measure binary size
+        shell: bash
+        run: |
+          BIN="target/${{ matrix.target }}/release/${{ matrix.binary }}"
+          SIZE=$(stat --format=%s "$BIN" 2>/dev/null || stat -f%z "$BIN" 2>/dev/null)
+          SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $SIZE / 1048576}")
+          echo "## ${{ matrix.name }}: ${SIZE_MB} MB" >> $GITHUB_STEP_SUMMARY
+
+      - name: Package (tar.gz)
+        if: "!contains(matrix.archive, '.zip')"
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary }}" dist/
+          cp LICENSE-MIT README.md dist/ 2>/dev/null || true
+          tar -czf "${{ matrix.archive }}" -C dist .
+
+      - name: Package (zip)
+        if: contains(matrix.archive, '.zip')
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary }}" dist/
+          Copy-Item LICENSE-MIT, README.md dist/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist/* -DestinationPath "${{ matrix.archive }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.archive }}
+
+  # ── Create GitHub Release ──────────────────────────────────
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: find artifacts -type f | head -20
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-alpha') || contains(github.ref, '-beta') }}
