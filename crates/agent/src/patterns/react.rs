@@ -647,22 +647,22 @@ impl ReactAgent {
                 let llm_duration_ms = llm_start.elapsed().as_millis() as u64;
 
                 // Record telemetry span for this LLM call
-                if let (Some(telem), Some(tid)) = (&telemetry, &trace_id) {
-                    if let Some(ref usage) = last_usage {
-                        let cost = telem.compute_cost(
-                            &model,
-                            usage.prompt_tokens,
-                            usage.completion_tokens,
-                        );
-                        let mut span = rustedclaw_telemetry::Span::new(
-                            rustedclaw_telemetry::SpanKind::LlmCall,
-                            &model,
-                        );
-                        span.record_tokens(usage.prompt_tokens, usage.completion_tokens, cost);
-                        span.duration_ms = Some(llm_duration_ms);
-                        span.end(true);
-                        telem.record_span(tid, span);
-                    }
+                if let (Some(telem), Some(tid)) = (&telemetry, &trace_id)
+                    && let Some(ref usage) = last_usage
+                {
+                    let cost = telem.compute_cost(
+                        &model,
+                        usage.prompt_tokens,
+                        usage.completion_tokens,
+                    );
+                    let mut span = rustedclaw_telemetry::Span::new(
+                        rustedclaw_telemetry::SpanKind::LlmCall,
+                        &model,
+                    );
+                    span.record_tokens(usage.prompt_tokens, usage.completion_tokens, cost);
+                    span.duration_ms = Some(llm_duration_ms);
+                    span.end(true);
+                    telem.record_span(tid, span);
                 }
 
                 // Record thought

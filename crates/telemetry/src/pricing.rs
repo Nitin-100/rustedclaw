@@ -168,17 +168,17 @@ impl PricingTable {
         let model_lower = model.to_lowercase();
         let bare_model = model_lower
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or(&model_lower);
 
         // Find the longest matching key whose bare name is a prefix of the model
         let mut best: Option<(&str, &ModelPricing)> = None;
         for (key, pricing) in prices.iter() {
-            let bare_key = key.split('/').last().unwrap_or(key);
-            if bare_model.starts_with(&bare_key.to_lowercase()) {
-                if best.is_none() || bare_key.len() > best.unwrap().0.len() {
-                    best = Some((key.as_str(), pricing));
-                }
+            let bare_key = key.split('/').next_back().unwrap_or(key);
+            if bare_model.starts_with(&bare_key.to_lowercase())
+                && (best.is_none() || bare_key.len() > best.unwrap().0.len())
+            {
+                best = Some((key.as_str(), pricing));
             }
         }
 
