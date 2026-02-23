@@ -5,15 +5,15 @@
 <h1 align="center">RustedClaw</h1>
 
 <p align="center">
-  <strong>The only AI agent runtime that runs on a Raspberry Pi.<br>~1 MB RAM. 3.9 MB binary. Zero dependencies. Zero sign-ups. Zero lock-in.</strong>
+  <strong>The lightest AI agent runtime you can self-host.<br>~6 MB RAM. < 4 MB binary. Zero runtime dependencies. Zero sign-ups. Zero lock-in.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/Nitin-100/rustedclaw/actions/workflows/ci.yml"><img src="https://github.com/Nitin-100/rustedclaw/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Nitin-100/rustedclaw/actions/workflows/bench.yml"><img src="https://github.com/Nitin-100/rustedclaw/actions/workflows/bench.yml/badge.svg" alt="Benchmarks"></a>
   <a href="#-quick-start"><img src="https://img.shields.io/badge/get_started-2_min-brightgreen?style=for-the-badge" alt="Get Started"></a>
-  <a href="#-benchmarks"><img src="https://img.shields.io/badge/RAM-~1_MB-critical?style=for-the-badge" alt="RAM"></a>
-  <a href="#-benchmarks"><img src="https://img.shields.io/badge/binary-3.9_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>
+  <a href="#-benchmarks"><img src="https://img.shields.io/badge/RAM-~6_MB-critical?style=for-the-badge" alt="RAM"></a>
+  <a href="#-benchmarks"><img src="https://img.shields.io/badge/binary-<_4_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
 </p>
 
@@ -27,9 +27,10 @@ Most AI agent runtimes want you to sign up, install databases, pull 300 MB of no
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  curl -LO .../rustedclaw && chmod +x rustedclaw             │
+│  git clone https://github.com/Nitin-100/rustedclaw.git      │
+│  cd rustedclaw && cargo build --release                     │
 │  export OPENAI_API_KEY="sk-..."                             │
-│  ./rustedclaw gateway                                       │
+│  ./target/release/rustedclaw gateway                        │
 │                                                             │
 │  That's it. Web UI at localhost:42617. Chat, tools, memory. │
 │  No Docker. No Postgres. No npm. No account. Just run it.   │
@@ -41,7 +42,7 @@ Most AI agent runtimes want you to sign up, install databases, pull 300 MB of no
 <td width="33%" align="center">
 
 **🪶 Absurdly Light**<br>
-~1 MB RAM idle. 1.3 MB peak under<br>
+~6 MB RSS idle. < 7 MB peak under<br>
 2,500 concurrent requests.<br>
 Your <em>terminal emulator</em> uses more.
 
@@ -69,26 +70,25 @@ Not a toy — a runtime.
 
 ## 🧪 Benchmarks
 
-All numbers independently verified on constrained Docker containers simulating low-end hardware.
-Test host: i7-12700F, 32 GB RAM, NVMe — numbers below are **not** host numbers.
+All numbers from CI and local benchmarks. Docker rows use `--memory` cgroup limits.
+Test host: i7-12700F, 32 GB RAM, Windows 11 — Linux/macOS from GitHub Actions runners.
 
-| Metric | Raspberry Pi (1 CPU, 256 MB) | $5 VPS (1 CPU, 512 MB) | $10 VPS (2 CPU, 1 GB) |
-|---|:---:|:---:|:---:|
-| **Idle RAM** | 996 KiB | 996 KiB | 1004 KiB |
-| **After 500 req** | 1.05 MiB | 1.02 MiB | 1.03 MiB |
-| **After 2500 concurrent** | 1.17 MiB | 1.28 MiB | 1.29 MiB |
-| **After 50 chat POSTs** | 1.16 MiB | 1.28 MiB | 1.29 MiB |
-| **Failure rate** | 0 / 3000+ | 0 / 1500+ | 0 / 1500+ |
-| **Sequential throughput** | 169 req/s | 198 req/s | 207 req/s |
+| Metric | Native (Windows, i7-12700F) | Docker (1 CPU, 256 MB) | Docker (1 CPU, 512 MB) | Docker (2 CPU, 1 GB) |
+|---|:---:|:---:|:---:|:---:|
+| **Idle RAM** | 6.3 MiB | 996 KiB¹ | 996 KiB¹ | 1004 KiB¹ |
+| **Peak RAM** | 6.9 MiB | 1.28 MiB¹ | 1.28 MiB¹ | 1.29 MiB¹ |
+| **Throughput** | 900 req/s | 169 req/s | 198 req/s | 207 req/s |
+| **Failure rate** | 0 / 2000+ | 0 / 3000+ | 0 / 1500+ | 0 / 1500+ |
+
+<sub>¹ Docker cgroup-constrained RSS — the kernel reclaims pages under memory pressure, so reported RSS is lower than unconstrained. Real idle RSS without cgroup limits is ~6 MB.</sub>
 
 **Machine-independent metrics:**
-- Binary size: **3.94 MB** (release, stripped, LTO)
+- Binary size: **~3.7 MB** (release, stripped, LTO — varies by platform)
 - Docker image: **44 MB** (distroless runtime)
 - Threads: **6** (Tokio worker_threads=2 + runtime)
-- Container cold start: **~350 ms** (includes Docker overhead)
-- Native cold start: **5.4 ms** average (i7-12700F + NVMe)
+- Cold start: **53 ms** (native, Windows) / **~350 ms** (Docker, includes container overhead)
 
-> RAM growth after thousands of requests: **< 0.3 MB**. No leaks detected.
+> RAM growth after thousands of requests: **< 1 MB**. No leaks detected.
 
 ---
 
@@ -101,10 +101,10 @@ There are several open-source AI agent runtimes. Here's how they compare:
 | **Language** | Rust | Zig | Rust | Rust | Rust + JS |
 | **Account Required** | **No** ✅ | **No** ✅ | **No** ✅ | **Yes** ❌ (NEAR AI) | **No** ✅ |
 | **External Deps** | **None** | **None** | **None** | PostgreSQL + pgvector | Node 18 + npm |
-| **Binary Size** | **3.9 MB** | **678 KB** 👑 | 8.8 MB | ~15 MB + Postgres | ~300 MB (node_modules) |
-| **Idle RAM** | **~1 MB** 🤝 | **~1 MB** 🤝 | ~8–12 MB¹ | ~50+ MB² | ~1.2 GB |
-| **Peak RAM** | **1.3 MB** (2.5K burst) | — | not published | — | — |
-| **Cold Start** | **<10 ms** | **<2 ms** 👑 | ~20 ms¹ | ~2 s² | ~4 s |
+| **Binary Size** | **~3.7 MB** | **678 KB** 👑 | 8.8 MB | ~15 MB + Postgres | ~300 MB (node_modules) |
+| **Idle RAM** | **~6 MB** | **~1 MB** 👑 | ~8–12 MB¹ | ~50+ MB² | ~1.2 GB |
+| **Peak RAM** | **~7 MB** (2.5K burst) | — | not published | — | — |
+| **Cold Start** | **53 ms** | **<2 ms** 👑 | ~20 ms¹ | ~2 s² | ~4 s |
 | **Tests** | **407** | 2843 | not published | not published | not published |
 | **Providers** | 11 | 22+ | 28+ | NEAR AI only | varies |
 | **Channels** | 6 | 13 | 17 | HTTP only | HTTP + WS |
@@ -113,7 +113,7 @@ There are several open-source AI agent runtimes. Here's how they compare:
 | **Memory** | SQLite + FTS5 | file-based | SQLite + vector | PostgreSQL + pgvector | in-memory |
 | **WASM Sandbox** | ✅ (opt-in) | ✅ | ✅ | ✅ | ❌ |
 | **License** | MIT | MIT | MIT | MIT + Apache-2.0 | Apache-2.0 |
-| **Deployment** | Copy 1 file | Copy 1 file | Copy 1 file | Docker + PostgreSQL | npm install → pray |
+| **Deployment** | `cargo build` or Docker | Copy 1 file | Copy 1 file | Docker + PostgreSQL | npm install → pray |
 
 <sub>¹ ZeroClaw self-reported for `--help`/`status` (exit immediately). Gateway idle RAM not published. Binary from macOS arm64 release.<br>
 ² IronClaw requires PostgreSQL + pgvector running alongside — total system footprint much higher.</sub>
@@ -124,18 +124,36 @@ There are several open-source AI agent runtimes. Here's how they compare:
 |---|---|
 | NEAR AI account (IronClaw) | **No account** — bring any API key |
 | PostgreSQL + pgvector (IronClaw) | **No external deps** — single binary |
-| 300 MB node_modules (OpenClaw) | **3.9 MB** — smaller than a JPEG |
-| 1.2 GB idle RAM (OpenClaw) | **~1 MB** — less than your shell |
+| 300 MB node_modules (OpenClaw) | **~3.7 MB** — smaller than a JPEG |
+| 1.2 GB idle RAM (OpenClaw) | **~6 MB** — less than your shell |
 | No Web UI (nullclaw) | **Built-in Web UI** — 7-page SPA |
 | No memory/search (nullclaw) | **SQLite + FTS5** — full-text search |
 
-> **nullclaw** is smaller (Zig). **ZeroClaw** has more providers. But nothing else matches ~1 MB RAM + Web UI + 4 agent patterns + memory + zero deps in a single binary.
+> **nullclaw** is smaller (Zig). **ZeroClaw** has more providers. But nothing else matches ~6 MB RAM + Web UI + 4 agent patterns + memory + zero runtime deps in a single binary.
 
 ---
 
 ## 🚀 Quick Start
 
-### Option A — Docker (recommended, 2 minutes)
+### Option A — Build from Source
+
+```bash
+git clone https://github.com/Nitin-100/rustedclaw.git && cd rustedclaw
+cargo build --release
+
+# First-time setup
+./target/release/rustedclaw onboard
+
+# Set your key
+export OPENAI_API_KEY="sk-..."
+
+# Start the Web UI + API
+./target/release/rustedclaw gateway
+```
+
+Open **http://localhost:42617** — done. Requires Rust 1.88+.
+
+### Option B — Docker
 
 ```bash
 git clone https://github.com/Nitin-100/rustedclaw.git && cd rustedclaw
@@ -148,34 +166,6 @@ docker compose up -d
 ```
 
 Open **http://localhost:42617** — done. Chat away.
-
-### Option B — Pre-built Binary (no Docker)
-
-```bash
-# Download from Releases
-curl -LO https://github.com/Nitin-100/rustedclaw/releases/latest/download/rustedclaw-linux-x86_64.tar.gz
-tar xzf rustedclaw-linux-x86_64.tar.gz
-
-# First-time setup
-./rustedclaw onboard
-
-# Set your key
-export OPENAI_API_KEY="sk-..."
-
-# Start the Web UI + API
-./rustedclaw gateway
-```
-
-### Option C — Build from Source
-
-```bash
-git clone https://github.com/Nitin-100/rustedclaw.git && cd rustedclaw
-cargo build --release
-./target/release/rustedclaw onboard
-./target/release/rustedclaw gateway
-```
-
-Requires Rust 1.88+. No other dependencies.
 
 ---
 
