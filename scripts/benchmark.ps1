@@ -1,4 +1,4 @@
-#
+﻿#
 # RustedClaw Benchmark Script — Windows (PowerShell 5.1+)
 #
 # Usage:
@@ -64,7 +64,7 @@ Get-Process -Name "rustedclaw" -ErrorAction SilentlyContinue | Stop-Process -For
 Start-Sleep -Seconds 1
 
 $gwProcess = Start-Process -FilePath $BinaryFullPath -ArgumentList "gateway","--port",$Port `
-    -PassThru -NoNewWindow -RedirectStandardError "NUL" -RedirectStandardOutput "NUL"
+    -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 3
 
 if ($gwProcess.HasExited) {
@@ -194,7 +194,7 @@ Write-Host "╚═════════════════════�
 @"
 RustedClaw Benchmark Results
 $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
-$([System.Environment]::OSVersion.VersionString) — $([System.Environment]::ProcessorCount) CPUs
+$([System.Environment]::OSVersion.VersionString) - $([System.Environment]::ProcessorCount) CPUs
 
 Binary Size:      $binSizeMB MB
 Cold Start:       $avgMs ms (avg of $runs runs)

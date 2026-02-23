@@ -21,6 +21,7 @@ use rustedclaw_core::memory::{MemoryBackend, MemoryEntry, MemoryQuery, SearchMod
 use rustedclaw_core::message::{Conversation, Message};
 use rustedclaw_core::provider::{Provider, ProviderRequest};
 use rustedclaw_core::tool::{ToolCall, ToolRegistry};
+use rustedclaw_telemetry::TelemetryEngine;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
@@ -55,6 +56,8 @@ pub struct ReactAgent {
     auto_save: bool,
     /// Maximum memories to recall per turn.
     recall_limit: usize,
+    /// Optional telemetry engine for execution tracing and cost tracking.
+    telemetry: Option<Arc<TelemetryEngine>>,
 }
 
 /// The result of a ReAct execution.
@@ -96,6 +99,7 @@ impl ReactAgent {
             memory: None,
             auto_save: false,
             recall_limit: 5,
+            telemetry: None,
         }
     }
 
@@ -132,6 +136,12 @@ impl ReactAgent {
     /// Set the maximum number of memories to recall per turn.
     pub fn with_recall_limit(mut self, limit: usize) -> Self {
         self.recall_limit = limit;
+        self
+    }
+
+    /// Attach a telemetry engine for execution tracing and cost tracking.
+    pub fn with_telemetry(mut self, engine: Arc<TelemetryEngine>) -> Self {
+        self.telemetry = Some(engine);
         self
     }
 
@@ -225,6 +235,12 @@ impl ReactAgent {
 
         info!(model = %self.model, max_iter = self.max_iterations, "ReAct loop starting");
 
+        // ── Start telemetry trace ──
+        let trace_id = self
+            .telemetry
+            .as_ref()
+            .map(|t| t.start_trace(conversation.id.to_string()));
+
         // ── Auto-recall memories ──
         let recalled = self.recall_memories(user_message).await;
         let all_memories: Vec<MemoryEntry> = if recalled.is_empty() {
@@ -283,7 +299,9 @@ impl ReactAgent {
             };
 
             // ── Call LLM ──
+            let llm_start = std::time::Instant::now();
             let response = self.provider.complete(request).await?;
+            let llm_duration_ms = llm_start.elapsed().as_millis() as u64;
 
             // Track usage
             if let Some(usage) = &response.usage {
@@ -293,6 +311,23 @@ impl ReactAgent {
                     tokens_used: usage.total_tokens,
                     timestamp: chrono::Utc::now(),
                 });
+
+                // Record telemetry span for this LLM call
+                if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+                    let cost = telemetry.compute_cost(
+                        &response.model,
+                        usage.prompt_tokens,
+                        usage.completion_tokens,
+                    );
+                    let mut span = rustedclaw_telemetry::Span::new(
+                        rustedclaw_telemetry::SpanKind::LlmCall,
+                        &response.model,
+                    );
+                    span.record_tokens(usage.prompt_tokens, usage.completion_tokens, cost);
+                    span.duration_ms = Some(llm_duration_ms);
+                    span.end(true);
+                    telemetry.record_span(tid, span);
+                }
             }
 
             // ── Record thought ──
@@ -308,6 +343,11 @@ impl ReactAgent {
                 // ── Auto-save to memory ──
                 self.auto_save_to_memory(user_message, &answer, conversation)
                     .await;
+
+                // ── End telemetry trace ──
+                if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+                    telemetry.end_trace(tid);
+                }
 
                 info!(
                     iterations = wm.iterations,
@@ -363,6 +403,17 @@ impl ReactAgent {
                             timestamp: chrono::Utc::now(),
                         });
 
+                        // Record tool span in telemetry
+                        if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+                            let mut span = rustedclaw_telemetry::Span::new(
+                                rustedclaw_telemetry::SpanKind::ToolExecution,
+                                &tc.name,
+                            );
+                            span.duration_ms = Some(duration_ms);
+                            span.end(tool_result.success);
+                            telemetry.record_span(tid, span);
+                        }
+
                         conversation.push(Message::tool_result(&tc.id, &tool_result.output));
                     }
                     Err(e) => {
@@ -377,6 +428,17 @@ impl ReactAgent {
                             timestamp: chrono::Utc::now(),
                         });
 
+                        // Record failed tool span in telemetry
+                        if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+                            let mut span = rustedclaw_telemetry::Span::new(
+                                rustedclaw_telemetry::SpanKind::ToolExecution,
+                                &tc.name,
+                            );
+                            span.duration_ms = Some(duration_ms);
+                            span.end(false);
+                            telemetry.record_span(tid, span);
+                        }
+
                         conversation.push(Message::tool_result(&tc.id, &error_msg));
                     }
                 }
@@ -384,6 +446,11 @@ impl ReactAgent {
         }
 
         // Max iterations exceeded — return partial result.
+        // ── End telemetry trace ──
+        if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+            telemetry.end_trace(tid);
+        }
+
         let answer =
             "I've reached the maximum number of reasoning iterations. Here's what I found so far."
                 .to_string();
@@ -427,6 +494,7 @@ impl ReactAgent {
         let memory = self.memory.clone();
         let auto_save = self.auto_save;
         let recall_limit = self.recall_limit;
+        let telemetry = self.telemetry.clone();
         let user_msg = user_message.to_string();
         let mut conv = conversation.clone();
         let memories = memories.to_vec();
@@ -438,6 +506,9 @@ impl ReactAgent {
             let tool_defs = tools.definitions();
             let mut total_tool_calls = 0usize;
             let conv_id = conv.id.to_string();
+
+            // ── Start telemetry trace ──
+            let trace_id = telemetry.as_ref().map(|t| t.start_trace(&conv_id));
 
             // ── Auto-recall memories ──
             let recalled: Vec<MemoryEntry> = if let Some(mem) = &memory {
@@ -511,6 +582,7 @@ impl ReactAgent {
                 };
 
                 // ── Stream from provider ──
+                let llm_start = std::time::Instant::now();
                 let mut stream_rx = match provider.stream(request).await {
                     Ok(rx) => rx,
                     Err(e) => {
@@ -570,6 +642,24 @@ impl ReactAgent {
                     }
                 }
 
+                let llm_duration_ms = llm_start.elapsed().as_millis() as u64;
+
+                // Record telemetry span for this LLM call
+                if let (Some(telem), Some(tid)) = (&telemetry, &trace_id)
+                    && let Some(ref usage) = last_usage
+                {
+                    let cost =
+                        telem.compute_cost(&model, usage.prompt_tokens, usage.completion_tokens);
+                    let mut span = rustedclaw_telemetry::Span::new(
+                        rustedclaw_telemetry::SpanKind::LlmCall,
+                        &model,
+                    );
+                    span.record_tokens(usage.prompt_tokens, usage.completion_tokens, cost);
+                    span.duration_ms = Some(llm_duration_ms);
+                    span.end(true);
+                    telem.record_span(tid, span);
+                }
+
                 // Record thought
                 if !full_content.is_empty() {
                     wm.add_thought(&full_content);
@@ -606,6 +696,11 @@ impl ReactAgent {
                             embedding: None,
                         };
                         let _ = mem.store(entry).await;
+                    }
+
+                    // ── End telemetry trace ──
+                    if let (Some(telem), Some(tid)) = (&telemetry, &trace_id) {
+                        telem.end_trace(tid);
                     }
 
                     let _ = tx
@@ -665,6 +760,17 @@ impl ReactAgent {
                                 timestamp: Utc::now(),
                             });
 
+                            // Record tool span in telemetry
+                            if let (Some(telem), Some(tid)) = (&telemetry, &trace_id) {
+                                let mut span = rustedclaw_telemetry::Span::new(
+                                    rustedclaw_telemetry::SpanKind::ToolExecution,
+                                    &tc.name,
+                                );
+                                span.duration_ms = Some(duration_ms);
+                                span.end(tool_result.success);
+                                telem.record_span(tid, span);
+                            }
+
                             let _ = tx
                                 .send(AgentStreamEvent::ToolResult {
                                     id: tc.id.clone(),
@@ -688,6 +794,17 @@ impl ReactAgent {
                                 timestamp: Utc::now(),
                             });
 
+                            // Record failed tool span in telemetry
+                            if let (Some(telem), Some(tid)) = (&telemetry, &trace_id) {
+                                let mut span = rustedclaw_telemetry::Span::new(
+                                    rustedclaw_telemetry::SpanKind::ToolExecution,
+                                    &tc.name,
+                                );
+                                span.duration_ms = Some(duration_ms);
+                                span.end(false);
+                                telem.record_span(tid, span);
+                            }
+
                             let _ = tx
                                 .send(AgentStreamEvent::ToolResult {
                                     id: tc.id.clone(),
@@ -704,6 +821,11 @@ impl ReactAgent {
             }
 
             // Max iterations exceeded
+            // ── End telemetry trace ──
+            if let (Some(telem), Some(tid)) = (&telemetry, &trace_id) {
+                telem.end_trace(tid);
+            }
+
             let _ = tx
                 .send(AgentStreamEvent::Done {
                     conversation_id: conv_id,
