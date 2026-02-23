@@ -468,22 +468,25 @@
             }
 
             container.innerHTML = contracts.map(c => {
-                const enfBadge = c.enforcement === 'block' ? 'badge-red'
-                    : c.enforcement === 'warn' ? 'badge-orange' : 'badge-blue';
-                const ruleDisplay = typeof c.rule === 'object' ? JSON.stringify(c.rule) : (c.rule || '—');
+                const actionBadge = c.action === 'deny' ? 'badge-red'
+                    : c.action === 'warn' ? 'badge-orange'
+                    : c.action === 'confirm' ? 'badge-purple' : 'badge-green';
 
                 return `
                     <div class="card">
                         <div class="card-header">
                             <span class="card-title">🛡️ ${escapeHtml(c.name)}</span>
                             <div>
-                                <span class="badge badge-purple">${escapeHtml(c.scope || 'global')}</span>
-                                <span class="badge ${enfBadge}">${escapeHtml(c.enforcement || 'log')}</span>
+                                <span class="badge badge-blue">${escapeHtml(c.trigger || '—')}</span>
+                                <span class="badge ${actionBadge}">${escapeHtml(c.action || 'deny')}</span>
+                                ${c.enabled === false ? '<span class="badge badge-dim">disabled</span>' : ''}
+                                ${c.priority ? `<span class="badge badge-dim">p${c.priority}</span>` : ''}
                             </div>
                         </div>
                         <div class="card-body">
-                            <div><strong>Rule:</strong> <code style="color:var(--accent)">${escapeHtml(c.rule_type || '')}</code></div>
-                            <div style="font-family:var(--font-mono);font-size:12px;margin-top:4px;color:var(--text-dim)">${escapeHtml(ruleDisplay)}</div>
+                            ${c.condition ? `<div><strong>Condition:</strong> <code style="color:var(--accent)">${escapeHtml(c.condition)}</code></div>` : ''}
+                            ${c.message ? `<div style="margin-top:4px;color:var(--text-dim)">${escapeHtml(c.message)}</div>` : ''}
+                            ${c.description ? `<div style="margin-top:4px;font-size:12px;color:var(--text-dim)">${escapeHtml(c.description)}</div>` : ''}
                         </div>
                         <div class="card-actions">
                             <button class="btn btn-sm btn-danger" onclick="window._deleteContract('${escapeHtml(c.name)}')">Delete</button>
@@ -508,32 +511,29 @@
 
     async function createContract() {
         const name = document.getElementById('contract-name').value.trim();
-        const scope = document.getElementById('contract-scope').value;
-        const enforcement = document.getElementById('contract-enforcement').value;
-        const ruleType = document.getElementById('contract-rule-type').value;
-        const ruleValueRaw = document.getElementById('contract-rule-value').value.trim();
+        const trigger = document.getElementById('contract-trigger').value.trim();
+        const action = document.getElementById('contract-action').value;
+        const condition = document.getElementById('contract-condition').value.trim();
+        const message = document.getElementById('contract-message').value.trim();
+        const priority = parseInt(document.getElementById('contract-priority').value) || 0;
 
         if (!name) { toast('Contract name required', 'error'); return; }
-
-        let ruleValue;
-        try {
-            ruleValue = ruleValueRaw ? JSON.parse(ruleValueRaw) : {};
-        } catch {
-            toast('Invalid JSON in rule value', 'error');
-            return;
-        }
+        if (!trigger) { toast('Trigger required (e.g. tool:shell)', 'error'); return; }
 
         try {
             await api.post('/contracts', {
                 name,
-                scope,
-                enforcement,
-                rule_type: ruleType,
-                rule: ruleValue,
+                trigger,
+                action,
+                condition,
+                message,
+                priority,
+                enabled: true,
             });
             toast(`Contract "${name}" created!`, 'success');
             document.getElementById('contract-form').style.display = 'none';
-            ['contract-name', 'contract-rule-value'].forEach(id => document.getElementById(id).value = '');
+            ['contract-name', 'contract-trigger', 'contract-condition', 'contract-message'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('contract-priority').value = '0';
             loadContracts();
         } catch (e) {
             toast(`Failed: ${e.message}`, 'error');

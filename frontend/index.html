@@ -175,39 +175,33 @@
                     <div class="form-grid">
                         <div>
                             <label class="form-label">Contract Name</label>
-                            <input type="text" id="contract-name" placeholder="e.g. max_tokens_per_call" class="form-input">
+                            <input type="text" id="contract-name" placeholder="e.g. no-rm-rf" class="form-input">
                         </div>
                         <div>
-                            <label class="form-label">Scope</label>
-                            <select id="contract-scope" class="form-input">
-                                <option value="global">Global</option>
-                                <option value="tool">Tool</option>
-                                <option value="provider">Provider</option>
+                            <label class="form-label">Trigger</label>
+                            <input type="text" id="contract-trigger" placeholder='e.g. tool:shell, tool:http, tool:file_write' class="form-input">
+                        </div>
+                        <div>
+                            <label class="form-label">Action</label>
+                            <select id="contract-action" class="form-input">
+                                <option value="deny">Deny (block)</option>
+                                <option value="warn">Warn (log + allow)</option>
+                                <option value="confirm">Confirm (ask user)</option>
+                                <option value="allow">Allow (explicit pass)</option>
                             </select>
                         </div>
                         <div>
-                            <label class="form-label">Enforcement</label>
-                            <select id="contract-enforcement" class="form-input">
-                                <option value="log">Log Only</option>
-                                <option value="warn">Warn</option>
-                                <option value="block">Block</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label">Rule Type</label>
-                            <select id="contract-rule-type" class="form-input">
-                                <option value="max_tokens">Max Tokens</option>
-                                <option value="max_cost">Max Cost</option>
-                                <option value="rate_limit">Rate Limit</option>
-                                <option value="allowed_tools">Allowed Tools</option>
-                                <option value="blocked_tools">Blocked Tools</option>
-                                <option value="custom">Custom</option>
-                            </select>
+                            <label class="form-label">Priority</label>
+                            <input type="number" id="contract-priority" value="0" class="form-input">
                         </div>
                     </div>
                     <div>
-                        <label class="form-label">Rule Value (JSON)</label>
-                        <textarea id="contract-rule-value" placeholder='e.g. {"max": 4096} or {"tools": ["shell", "file_write"]}' rows="2" class="form-textarea"></textarea>
+                        <label class="form-label">Condition (DSL)</label>
+                        <input type="text" id="contract-condition" placeholder='e.g. args.command CONTAINS "rm -rf"' class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Message</label>
+                        <input type="text" id="contract-message" placeholder="e.g. Blocked: rm -rf is forbidden" class="form-input">
                     </div>
                     <div class="form-row">
                         <button class="btn btn-sm btn-primary" id="contract-save-btn">Create Contract</button>
