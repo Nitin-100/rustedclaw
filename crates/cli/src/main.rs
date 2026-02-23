@@ -117,6 +117,12 @@ enum Commands {
         action: ConfigAction,
     },
 
+    /// Manage agent behavior contracts (guardrails)
+    Contract {
+        #[command(subcommand)]
+        action: ContractAction,
+    },
+
     /// List supported LLM providers and aliases
     Providers,
 
@@ -178,6 +184,21 @@ enum ConfigAction {
     Show,
     /// Show the config file path
     Path,
+}
+
+#[derive(Subcommand)]
+enum ContractAction {
+    /// List all configured contracts
+    List,
+    /// Validate contract definitions
+    Validate,
+    /// Test a contract against a simulated tool call
+    Test {
+        /// Tool name to simulate (e.g. "shell")
+        tool: String,
+        /// Arguments JSON or simple string (e.g. '{"command": "rm -rf /"}')
+        args: String,
+    },
 }
 
 #[derive(Clone, clap::ValueEnum)]
@@ -248,6 +269,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ConfigAction::Validate => commands::config_cmd::validate().await?,
             ConfigAction::Show => commands::config_cmd::show().await?,
             ConfigAction::Path => commands::config_cmd::path().await?,
+        },
+
+        Commands::Contract { action } => match action {
+            ContractAction::List => commands::contract::list().await?,
+            ContractAction::Validate => commands::contract::validate().await?,
+            ContractAction::Test { tool, args } => commands::contract::test(&tool, &args).await?,
         },
 
         Commands::Providers => commands::providers::run().await?,

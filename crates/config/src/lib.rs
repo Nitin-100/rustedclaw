@@ -75,6 +75,10 @@ pub struct AppConfig {
     /// Routine (scheduled task) configurations
     #[serde(default)]
     pub routines: Vec<RoutineConfig>,
+
+    /// Agent contract configurations (behavior guardrails)
+    #[serde(default)]
+    pub contracts: Vec<ContractConfig>,
 }
 
 fn default_provider() -> String {
@@ -393,6 +397,44 @@ pub enum RoutineAction {
     },
 }
 
+/// Configuration for an agent behavior contract (guardrail).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContractConfig {
+    /// Unique name for this contract
+    pub name: String,
+
+    /// Human-readable description
+    #[serde(default)]
+    pub description: String,
+
+    /// What triggers this contract (e.g. "tool:shell", "tool:*", "response")
+    pub trigger: String,
+
+    /// Condition expression (e.g. `args.command CONTAINS "rm -rf"`)
+    #[serde(default)]
+    pub condition: String,
+
+    /// Action to take: "deny", "confirm", "warn", "allow"
+    #[serde(default = "default_deny")]
+    pub action: String,
+
+    /// Message to display when the contract fires
+    #[serde(default)]
+    pub message: String,
+
+    /// Whether this contract is enabled
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// Priority (higher = evaluated first)
+    #[serde(default)]
+    pub priority: i32,
+}
+
+fn default_deny() -> String {
+    "deny".into()
+}
+
 impl AppConfig {
     /// Load configuration from the default path (~/.rustedclaw/config.toml).
     ///
@@ -505,6 +547,7 @@ impl Default for AppConfig {
             tunnel: TunnelConfig::default(),
             secrets: SecretsConfig::default(),
             routines: vec![],
+            contracts: vec![],
         }
     }
 }
