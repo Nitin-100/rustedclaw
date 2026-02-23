@@ -79,6 +79,10 @@ pub struct AppConfig {
     /// Agent contract configurations (behavior guardrails)
     #[serde(default)]
     pub contracts: Vec<ContractConfig>,
+
+    /// Telemetry, cost tracking, and budget configuration
+    #[serde(default)]
+    pub telemetry: TelemetryConfig,
 }
 
 fn default_provider() -> String {
@@ -435,6 +439,59 @@ fn default_deny() -> String {
     "deny".into()
 }
 
+/// Telemetry, cost tracking, and budget configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TelemetryConfig {
+    /// Whether telemetry is enabled
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// Spending budgets
+    #[serde(default)]
+    pub budgets: Vec<BudgetConfig>,
+
+    /// Custom model pricing overrides (model name → pricing)
+    #[serde(default)]
+    pub custom_pricing: HashMap<String, PricingOverrideConfig>,
+}
+
+impl Default for TelemetryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            budgets: vec![],
+            custom_pricing: HashMap::new(),
+        }
+    }
+}
+
+/// A spending budget limit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BudgetConfig {
+    /// Scope: "per_request", "per_session", "daily", "monthly", "total"
+    pub scope: String,
+
+    /// Maximum spend in USD
+    pub max_usd: f64,
+
+    /// Maximum tokens (0 = unlimited)
+    #[serde(default)]
+    pub max_tokens: u64,
+
+    /// Action when exceeded: "deny" or "warn"
+    #[serde(default = "default_deny")]
+    pub on_exceed: String,
+}
+
+/// Custom per-million-token pricing for a model.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PricingOverrideConfig {
+    /// Price per 1M input tokens in USD
+    pub input_per_m: f64,
+    /// Price per 1M output tokens in USD
+    pub output_per_m: f64,
+}
+
 impl AppConfig {
     /// Load configuration from the default path (~/.rustedclaw/config.toml).
     ///
@@ -548,6 +605,7 @@ impl Default for AppConfig {
             secrets: SecretsConfig::default(),
             routines: vec![],
             contracts: vec![],
+            telemetry: TelemetryConfig::default(),
         }
     }
 }

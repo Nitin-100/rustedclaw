@@ -8,6 +8,7 @@ use rustedclaw_core::memory::{MemoryBackend, MemoryEntry, MemoryQuery, SearchMod
 use rustedclaw_core::message::{Conversation, Message};
 use rustedclaw_core::provider::{Provider, ProviderRequest};
 use rustedclaw_core::tool::{ToolCall, ToolRegistry};
+use rustedclaw_telemetry::TelemetryEngine;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -48,6 +49,9 @@ pub struct AgentLoop {
 
     /// Optional contract engine for behavior guardrails
     contracts: Option<Arc<ContractEngine>>,
+
+    /// Optional telemetry engine for cost tracking & tracing
+    telemetry: Option<Arc<TelemetryEngine>>,
 }
 
 impl AgentLoop {
@@ -73,6 +77,7 @@ impl AgentLoop {
             auto_save: false,
             recall_limit: 5,
             contracts: None,
+            telemetry: None,
         }
     }
 
@@ -109,6 +114,12 @@ impl AgentLoop {
     /// Attach a contract engine for behavior guardrails.
     pub fn with_contracts(mut self, engine: Arc<ContractEngine>) -> Self {
         self.contracts = Some(engine);
+        self
+    }
+
+    /// Attach a telemetry engine for execution tracing and cost tracking.
+    pub fn with_telemetry(mut self, engine: Arc<TelemetryEngine>) -> Self {
+        self.telemetry = Some(engine);
         self
     }
 
@@ -262,6 +273,12 @@ impl AgentLoop {
         let tool_definitions = self.tools.definitions();
         let mut iteration = 0;
 
+        // ── Start telemetry trace for this turn ──
+        let trace_id = self
+            .telemetry
+            .as_ref()
+            .map(|t| t.start_trace(conversation.id.to_string()));
+
         loop {
             iteration += 1;
 
@@ -291,10 +308,37 @@ impl AgentLoop {
                 stop: vec![],
             };
 
-            // Call the LLM
-            let response = self.provider.complete(request).await?;
+            // ── Budget pre-check ──
+            if let Some(telemetry) = &self.telemetry {
+                // Estimate cost (rough: assume ~1000 output tokens)
+                let est_cost = telemetry.compute_cost(&self.model, 0, 1000);
+                if let Err(e) = telemetry.check_budget(est_cost) {
+                    warn!("Budget exceeded: {e}");
+                    self.event_bus.publish(DomainEvent::BudgetExceeded {
+                        scope: "pre_check".into(),
+                        spent_usd: 0.0,
+                        limit_usd: 0.0,
+                        action: "deny".into(),
+                        timestamp: chrono::Utc::now(),
+                    });
+                    if let Some(tid) = &trace_id {
+                        telemetry.end_trace(tid);
+                    }
+                    return Err(rustedclaw_core::Error::Provider(
+                        rustedclaw_core::error::ProviderError::ApiError {
+                            status_code: 429,
+                            message: format!("Budget exceeded: {e}"),
+                        },
+                    ));
+                }
+            }
 
-            // Track token usage
+            // Call the LLM
+            let llm_start = std::time::Instant::now();
+            let response = self.provider.complete(request).await?;
+            let llm_duration_ms = llm_start.elapsed().as_millis() as u64;
+
+            // Track token usage + telemetry span
             if let Some(usage) = &response.usage {
                 self.event_bus.publish(DomainEvent::ResponseGenerated {
                     conversation_id: conversation.id.to_string(),
@@ -302,6 +346,23 @@ impl AgentLoop {
                     tokens_used: usage.total_tokens,
                     timestamp: chrono::Utc::now(),
                 });
+
+                // Record telemetry span for this LLM call
+                if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+                    let cost = telemetry.compute_cost(
+                        &response.model,
+                        usage.prompt_tokens,
+                        usage.completion_tokens,
+                    );
+                    let mut span = rustedclaw_telemetry::Span::new(
+                        rustedclaw_telemetry::SpanKind::LlmCall,
+                        &response.model,
+                    );
+                    span.record_tokens(usage.prompt_tokens, usage.completion_tokens, cost);
+                    span.end(true);
+                    span.duration_ms = Some(llm_duration_ms);
+                    telemetry.record_span(tid, span);
+                }
             }
 
             // Check if the LLM wants to call tools
@@ -312,6 +373,11 @@ impl AgentLoop {
 
                 // ── Auto-save to memory ──
                 self.auto_save_to_memory(conversation).await;
+
+                // ── End telemetry trace ──
+                if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+                    telemetry.end_trace(tid);
+                }
 
                 return Ok(response_text);
             }
@@ -371,6 +437,17 @@ impl AgentLoop {
                             timestamp: chrono::Utc::now(),
                         });
 
+                        // Record tool span in telemetry
+                        if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+                            let mut span = rustedclaw_telemetry::Span::new(
+                                rustedclaw_telemetry::SpanKind::ToolExecution,
+                                &tc.name,
+                            );
+                            span.duration_ms = Some(duration_ms);
+                            span.end(tool_result.success);
+                            telemetry.record_span(tid, span);
+                        }
+
                         // Add tool result to conversation
                         conversation.push(Message::tool_result(&tc.id, &tool_result.output));
                     }
@@ -384,6 +461,17 @@ impl AgentLoop {
                             timestamp: chrono::Utc::now(),
                         });
 
+                        // Record failed tool span
+                        if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+                            let mut span = rustedclaw_telemetry::Span::new(
+                                rustedclaw_telemetry::SpanKind::ToolExecution,
+                                &tc.name,
+                            );
+                            span.duration_ms = Some(duration_ms);
+                            span.end(false);
+                            telemetry.record_span(tid, span);
+                        }
+
                         // Report error to the LLM so it can recover
                         conversation.push(Message::tool_result(&tc.id, format!("Error: {e}")));
                     }
@@ -395,6 +483,9 @@ impl AgentLoop {
 
         // If we hit max iterations, return whatever we have
         self.auto_save_to_memory(conversation).await;
+        if let (Some(telemetry), Some(tid)) = (&self.telemetry, &trace_id) {
+            telemetry.end_trace(tid);
+        }
         Ok("I've reached the maximum number of tool call iterations. Please provide further guidance.".into())
     }
 }

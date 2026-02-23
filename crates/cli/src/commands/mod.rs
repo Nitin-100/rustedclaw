@@ -11,3 +11,4 @@ pub mod onboard;
 pub mod providers;
 pub mod routine;
 pub mod status;
+pub mod usage;
