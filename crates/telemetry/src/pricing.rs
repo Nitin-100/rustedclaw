@@ -166,10 +166,7 @@ impl PricingTable {
         //    e.g. "gpt-4o-mini-2024-07-18" should match "gpt-4o-mini"
         //    or "openai/gpt-4o-mini"
         let model_lower = model.to_lowercase();
-        let bare_model = model_lower
-            .split('/')
-            .next_back()
-            .unwrap_or(&model_lower);
+        let bare_model = model_lower.split('/').next_back().unwrap_or(&model_lower);
 
         // Find the longest matching key whose bare name is a prefix of the model
         let mut best: Option<(&str, &ModelPricing)> = None;

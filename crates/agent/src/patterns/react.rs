@@ -508,9 +508,7 @@ impl ReactAgent {
             let conv_id = conv.id.to_string();
 
             // ── Start telemetry trace ──
-            let trace_id = telemetry
-                .as_ref()
-                .map(|t| t.start_trace(&conv_id));
+            let trace_id = telemetry.as_ref().map(|t| t.start_trace(&conv_id));
 
             // ── Auto-recall memories ──
             let recalled: Vec<MemoryEntry> = if let Some(mem) = &memory {
@@ -650,11 +648,8 @@ impl ReactAgent {
                 if let (Some(telem), Some(tid)) = (&telemetry, &trace_id)
                     && let Some(ref usage) = last_usage
                 {
-                    let cost = telem.compute_cost(
-                        &model,
-                        usage.prompt_tokens,
-                        usage.completion_tokens,
-                    );
+                    let cost =
+                        telem.compute_cost(&model, usage.prompt_tokens, usage.completion_tokens);
                     let mut span = rustedclaw_telemetry::Span::new(
                         rustedclaw_telemetry::SpanKind::LlmCall,
                         &model,
