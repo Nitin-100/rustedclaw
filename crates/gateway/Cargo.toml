@@ -13,6 +13,7 @@ rustedclaw-providers = { workspace = true }
 rustedclaw-tools = { workspace = true }
 rustedclaw-memory = { workspace = true }
 rustedclaw-workflow = { workspace = true }
+rustedclaw-contracts = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true }
 tower = { workspace = true }

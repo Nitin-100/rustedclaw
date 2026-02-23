@@ -1963,6 +1963,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex"
+version = "1.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
 name = "regex-automata"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2079,6 +2091,7 @@ dependencies = [
  "rustedclaw-agent",
  "rustedclaw-channels",
  "rustedclaw-config",
+ "rustedclaw-contracts",
  "rustedclaw-core",
  "rustedclaw-gateway",
  "rustedclaw-memory",
@@ -2100,6 +2113,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "rustedclaw-config",
+ "rustedclaw-contracts",
  "rustedclaw-core",
  "rustedclaw-memory",
  "rustedclaw-providers",
@@ -2138,6 +2152,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustedclaw-contracts"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "regex",
+ "rustedclaw-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml",
+ "tracing",
+]
+
+[[package]]
 name = "rustedclaw-core"
 version = "0.1.0"
 dependencies = [
@@ -2163,6 +2192,7 @@ dependencies = [
  "http-body-util",
  "rustedclaw-agent",
  "rustedclaw-config",
+ "rustedclaw-contracts",
  "rustedclaw-core",
  "rustedclaw-memory",
  "rustedclaw-providers",

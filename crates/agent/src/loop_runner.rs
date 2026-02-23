@@ -7,6 +7,7 @@ use rustedclaw_core::memory::{MemoryBackend, MemoryEntry, MemoryQuery, SearchMod
 use rustedclaw_core::message::{Conversation, Message};
 use rustedclaw_core::provider::{Provider, ProviderRequest};
 use rustedclaw_core::tool::{ToolCall, ToolRegistry};
+use rustedclaw_contracts::ContractEngine;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -44,6 +45,9 @@ pub struct AgentLoop {
 
     /// Maximum memories to recall per turn
     recall_limit: usize,
+
+    /// Optional contract engine for behavior guardrails
+    contracts: Option<Arc<ContractEngine>>,
 }
 
 impl AgentLoop {
@@ -68,6 +72,7 @@ impl AgentLoop {
             memory: None,
             auto_save: false,
             recall_limit: 5,
+            contracts: None,
         }
     }
 
@@ -98,6 +103,12 @@ impl AgentLoop {
     /// Set the maximum number of memories to recall per turn.
     pub fn with_recall_limit(mut self, limit: usize) -> Self {
         self.recall_limit = limit;
+        self
+    }
+
+    /// Attach a contract engine for behavior guardrails.
+    pub fn with_contracts(mut self, engine: Arc<ContractEngine>) -> Self {
+        self.contracts = Some(engine);
         self
     }
 
@@ -322,6 +333,33 @@ impl AgentLoop {
                     name: tc.name.clone(),
                     arguments: serde_json::from_str(&tc.arguments).unwrap_or_default(),
                 };
+
+                // ── Contract check: evaluate before execution ──
+                if let Some(engine) = &self.contracts {
+                    let verdict = engine.check_tool_call(&call.name, &call.arguments);
+                    if !verdict.allowed {
+                        let action_str = format!("{:?}", verdict.action);
+                        self.event_bus.publish(DomainEvent::ContractViolation {
+                            contract_name: verdict.contract_name.clone().unwrap_or_default(),
+                            tool_name: Some(call.name.clone()),
+                            action: action_str,
+                            message: verdict.message.clone(),
+                            timestamp: chrono::Utc::now(),
+                        });
+
+                        let blocked_msg = format!(
+                            "🛑 Contract violation: {}",
+                            verdict.message
+                        );
+                        warn!(
+                            tool = %call.name,
+                            contract = ?verdict.contract_name,
+                            "Tool call blocked by contract"
+                        );
+                        conversation.push(Message::tool_result(&tc.id, &blocked_msg));
+                        continue; // Skip execution, move to next tool call
+                    }
+                }
 
                 let start = std::time::Instant::now();
                 let result = self.tools.execute(&call).await;

@@ -34,6 +34,7 @@ use rustedclaw_agent::{
     AgentStreamEvent, AssemblyInput, ContextAssembler, KnowledgeChunk, ReactAgent, TokenBudget,
     WorkingMemory,
 };
+use rustedclaw_contracts::ContractEngine;
 use rustedclaw_core::event::EventBus;
 use rustedclaw_core::identity::Identity;
 use rustedclaw_core::memory::MemoryEntry;
@@ -51,6 +52,7 @@ pub struct ApiV1State {
     pub tools: Arc<ToolRegistry>,
     pub identity: Identity,
     pub event_bus: Arc<EventBus>,
+    pub contracts: Arc<ContractEngine>,
     pub conversations: RwLock<HashMap<String, Conversation>>,
     pub workflow: Option<Arc<rustedclaw_workflow::WorkflowEngine>>,
     pub config: RwLock<rustedclaw_config::AppConfig>,
@@ -95,6 +97,12 @@ pub fn v1_router(state: SharedApiState) -> Router {
         .route("/channels/{name}/test", post(test_channel_handler))
         .route("/config", get(get_config_handler))
         .route("/config", axum::routing::patch(update_config_handler))
+        .route("/contracts", get(list_contracts_handler))
+        .route("/contracts", post(add_contract_handler))
+        .route(
+            "/contracts/{name}",
+            axum::routing::delete(delete_contract_handler),
+        )
         .route("/status", get(status_handler))
         .with_state(state)
 }
@@ -622,6 +630,9 @@ async fn log_stream_handler(
                 rustedclaw_core::event::DomainEvent::ErrorOccurred { .. } => "error_occurred",
                 rustedclaw_core::event::DomainEvent::AgentStateChanged { .. } => {
                     "agent_state_changed"
+                }
+                rustedclaw_core::event::DomainEvent::ContractViolation { .. } => {
+                    "contract_violation"
                 }
             };
             Ok(SseEvent::default().event(event_name).data(data))
@@ -1565,6 +1576,106 @@ fn merge_json(base: &mut serde_json::Value, patch: &serde_json::Value) {
 
 // ── Status endpoint ───────────────────────────────────────────────────────
 
+// ── Contract endpoints ────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct ContractDto {
+    name: String,
+    description: String,
+    trigger: String,
+    condition: String,
+    action: String,
+    message: String,
+    enabled: bool,
+    priority: i32,
+}
+
+async fn list_contracts_handler(State(state): State<SharedApiState>) -> Json<Vec<ContractDto>> {
+    let contracts = state.contracts.list_contracts();
+    Json(
+        contracts
+            .into_iter()
+            .map(|c| ContractDto {
+                name: c.name,
+                description: c.description,
+                trigger: c.trigger.into(),
+                action: format!("{:?}", c.action).to_lowercase(),
+                condition: c.condition,
+                message: c.message,
+                enabled: c.enabled,
+                priority: c.priority,
+            })
+            .collect(),
+    )
+}
+
+#[derive(Deserialize)]
+struct AddContractRequest {
+    name: String,
+    #[serde(default)]
+    description: String,
+    trigger: String,
+    #[serde(default)]
+    condition: String,
+    #[serde(default = "default_deny_action")]
+    action: String,
+    #[serde(default)]
+    message: String,
+    #[serde(default = "default_contract_enabled")]
+    enabled: bool,
+    #[serde(default)]
+    priority: i32,
+}
+
+fn default_deny_action() -> String {
+    "deny".into()
+}
+
+fn default_contract_enabled() -> bool {
+    true
+}
+
+async fn add_contract_handler(
+    State(state): State<SharedApiState>,
+    Json(req): Json<AddContractRequest>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let action = match req.action.as_str() {
+        "allow" => rustedclaw_contracts::Action::Allow,
+        "confirm" => rustedclaw_contracts::Action::Confirm,
+        "warn" => rustedclaw_contracts::Action::Warn,
+        "deny" => rustedclaw_contracts::Action::Deny,
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+    let contract = rustedclaw_contracts::Contract {
+        name: req.name.clone(),
+        description: req.description,
+        trigger: req.trigger.into(),
+        condition: req.condition,
+        action,
+        message: req.message,
+        enabled: req.enabled,
+        priority: req.priority,
+    };
+    state
+        .contracts
+        .add_contract(contract)
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    Ok(Json(serde_json::json!({ "added": req.name })))
+}
+
+async fn delete_contract_handler(
+    State(state): State<SharedApiState>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    if state.contracts.remove_contract(&name) {
+        Ok(Json(serde_json::json!({ "removed": name })))
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
+}
+
+// ── Status ────────────────────────────────────────────────────────────────
+
 #[derive(Serialize, Deserialize)]
 struct StatusResponse {
     status: String,
@@ -1574,6 +1685,7 @@ struct StatusResponse {
     memory_entries: usize,
     document_entries: usize,
     tools_count: usize,
+    contracts_count: usize,
     provider: String,
     workflow_engine: bool,
 }
@@ -1595,6 +1707,7 @@ async fn status_handler(State(state): State<SharedApiState>) -> Json<StatusRespo
         memory_entries: memories.len(),
         document_entries: documents.len(),
         tools_count: state.tools.definitions().len(),
+        contracts_count: state.contracts.active_count(),
         provider: state.provider.name().into(),
         workflow_engine: state.workflow.is_some(),
     })
@@ -1662,6 +1775,7 @@ mod tests {
             tools,
             identity,
             event_bus,
+            contracts: Arc::new(rustedclaw_contracts::ContractEngine::empty()),
             conversations: RwLock::new(HashMap::new()),
             workflow: Some(Arc::new(rustedclaw_workflow::WorkflowEngine::default())),
             config: RwLock::new(rustedclaw_config::AppConfig::default()),

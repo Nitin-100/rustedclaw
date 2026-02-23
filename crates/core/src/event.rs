@@ -55,6 +55,15 @@ pub enum DomainEvent {
         requests_processed: u64,
         timestamp: DateTime<Utc>,
     },
+
+    /// A contract was evaluated and produced a non-allow verdict
+    ContractViolation {
+        contract_name: String,
+        tool_name: Option<String>,
+        action: String,
+        message: String,
+        timestamp: DateTime<Utc>,
+    },
 }
 
 /// A broadcast-based event bus for domain events.

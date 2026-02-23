@@ -23,6 +23,7 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use rustedclaw_agent::AgentLoop;
+use rustedclaw_contracts::ContractEngine;
 use rustedclaw_core::event::EventBus;
 use rustedclaw_core::identity::{ContextPaths, Identity};
 use rustedclaw_core::message::{Conversation, Message};
@@ -101,6 +102,32 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
     let tools = Arc::new(rustedclaw_tools::default_registry());
     let event_bus = Arc::new(EventBus::default());
 
+    // Build contract engine from config
+    let contract_engine = {
+        let mut contract_set = rustedclaw_contracts::ContractSet::new();
+        for cc in &config.contracts {
+            contract_set.add(rustedclaw_contracts::Contract {
+                name: cc.name.clone(),
+                description: cc.description.clone(),
+                trigger: cc.trigger.clone().into(),
+                condition: cc.condition.clone(),
+                action: match cc.action.as_str() {
+                    "allow" => rustedclaw_contracts::Action::Allow,
+                    "confirm" => rustedclaw_contracts::Action::Confirm,
+                    "warn" => rustedclaw_contracts::Action::Warn,
+                    _ => rustedclaw_contracts::Action::Deny,
+                },
+                message: cc.message.clone(),
+                enabled: cc.enabled,
+                priority: cc.priority,
+            });
+        }
+        Arc::new(
+            ContractEngine::new(contract_set)
+                .expect("invalid contract configuration"),
+        )
+    };
+
     // Shared agent for legacy routes (reuses same provider/tools/identity)
     let agent = Arc::new(
         AgentLoop::new(
@@ -111,7 +138,8 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
             identity.clone(),
             event_bus.clone(),
         )
-        .with_max_tokens(config.default_max_tokens),
+        .with_max_tokens(config.default_max_tokens)
+        .with_contracts(contract_engine.clone()),
     );
 
     // Build shared state for legacy routes.
@@ -130,6 +158,7 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
         tools,
         identity,
         event_bus,
+        contracts: contract_engine,
         conversations: RwLock::new(HashMap::new()),
         workflow: Some(Arc::new(rustedclaw_workflow::WorkflowEngine::new(
             config.heartbeat.enabled,

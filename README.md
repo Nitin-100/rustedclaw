@@ -181,6 +181,7 @@ Open **http://localhost:42617** — done. Chat away.
 | **Web UI** | 7-page embedded SPA — Chat, Memory, Tools, Routines, Jobs, Logs, Settings |
 | **Streaming** | Real SSE for chat, logs, and events |
 | **Security** | Path validation, command sandboxing, WASM tool isolation, configurable autonomy levels |
+| **Agent Contracts** | Declarative behavior guardrails — deny, confirm, warn, or allow tool calls via TOML rules |
 | **Channels** | CLI, HTTP webhook, WebSocket, Telegram, Slack, Discord |
 | **Pairing** | Optional device-pairing for secure remote access |
 | **Migration** | Import data from OpenClaw with `rustedclaw migrate openclaw` |
@@ -210,6 +211,9 @@ rustedclaw memory stats         Show memory statistics
 rustedclaw memory search <q>    Search memories
 rustedclaw memory export        Export memories to JSON
 rustedclaw memory clear         Clear all memories
+rustedclaw contract list        List configured contracts
+rustedclaw contract validate    Validate contract definitions
+rustedclaw contract test <tool> <args>  Test a contract against a tool call
 rustedclaw migrate openclaw     Import from OpenClaw
 rustedclaw estop [--resume]     Emergency stop / resume
 rustedclaw completions <shell>  Generate shell completions
@@ -232,6 +236,13 @@ default_max_tokens = 4096
 port = 42617
 host = "0.0.0.0"
 require_pairing = false
+
+[[contracts]]
+name = "no-rm-rf"
+trigger = "tool:shell"
+condition = 'args.command CONTAINS "rm -rf"'
+action = "deny"
+message = "Blocked: rm -rf is forbidden"
 ```
 
 Or use environment variables — `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `RUSTEDCLAW_API_KEY`, `RUSTEDCLAW_PROVIDER`, `RUSTEDCLAW_MODEL`.
@@ -254,8 +265,63 @@ GET  /v1/memory?q=search+term   Search memories
 POST /v1/memory                 Save memory
 GET  /v1/status                 System status
 GET  /v1/config                 Runtime config
+GET  /v1/contracts              List agent contracts
+POST /v1/contracts              Add a contract at runtime
+DELETE /v1/contracts/:name      Remove a contract
 GET  /v1/jobs                   List background jobs
 GET  /v1/logs                   SSE log stream
+```
+
+---
+
+## 🛡️ Agent Contracts
+
+Declarative behavior guardrails for your AI agent. Define rules in `config.toml` that intercept tool calls _before_ they execute.
+
+**Condition DSL** supports: `CONTAINS`, `MATCHES` (regex), `STARTS_WITH`, `ENDS_WITH`, `==`, `!=`, `>`, `<`, `>=`, `<=`, `AND`, `OR`, `NOT`, parentheses, and dotted field paths (`args.nested.key`).
+
+```toml
+# Block dangerous commands
+[[contracts]]
+name = "no-rm-rf"
+trigger = "tool:shell"
+condition = 'args.command CONTAINS "rm -rf"'
+action = "deny"
+message = "Blocked: rm -rf is forbidden"
+
+# Warn on any file write
+[[contracts]]
+name = "warn-writes"
+trigger = "tool:file_write"
+action = "warn"
+message = "Agent is writing to a file"
+
+# Block internal network access
+[[contracts]]
+name = "no-internal-ips"
+trigger = "tool:http"
+condition = 'args.url MATCHES "https?://(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01]))"'
+action = "deny"
+message = "Internal network access is forbidden"
+priority = 10
+
+# Require confirmation for expensive operations
+[[contracts]]
+name = "confirm-purchases"
+trigger = "tool:purchase"
+condition = "args.amount > 100"
+action = "confirm"
+message = "Purchase over $100 requires confirmation"
+```
+
+Actions: `deny` (block), `confirm` (ask user), `warn` (log + allow), `allow` (explicit pass).
+
+Manage at runtime via CLI or REST API:
+
+```bash
+rustedclaw contract list                          # Show all contracts
+rustedclaw contract validate                      # Check for errors
+rustedclaw contract test shell '{"command":"rm -rf /"}'  # Simulate
 ```
 
 ---
@@ -287,6 +353,7 @@ rustedclaw/
 │   ├── tools/       # 9 built-in tools               (67 tests)
 │   ├── agent/       # ReAct, RAG, Coordinator        (62 tests)
 │   ├── gateway/     # Axum HTTP + SSE + WS           (32 tests)
+│   ├── contracts/   # Agent behavior contracts        (33 tests)
 │   ├── workflow/    # Cron engine                    (16 tests)
 │   ├── security/    # Sandboxing + WASM              (40 tests)
 │   └── cli/         # Binary entry point + commands   (6 + 17 e2e tests)
@@ -294,7 +361,7 @@ rustedclaw/
 ├── scripts/         # Benchmark scripts
 ├── Dockerfile
 ├── docker-compose.yml
-└── 407 tests, 0 failures
+└── 440 tests, 0 failures
 ```
 
 ---

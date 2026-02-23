@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod config_cmd;
+pub mod contract;
 pub mod daemon;
 pub mod doctor;
 pub mod estop;
