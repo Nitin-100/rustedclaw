@@ -83,6 +83,24 @@ pub fn build_from_config(config: &rustedclaw_config::AppConfig) -> ProviderRoute
                 p = p.with_base_url(&base_url);
             }
             Arc::new(p)
+        } else if name == "local" {
+            // Local inference via Candle — no HTTP, no API key needed
+            #[cfg(feature = "local")]
+            {
+                let model = provider_config
+                    .default_model
+                    .clone()
+                    .unwrap_or_else(|| "tinyllama".to_string());
+                Arc::new(crate::local::LocalProvider::new(&model))
+            }
+            #[cfg(not(feature = "local"))]
+            {
+                tracing::warn!(
+                    "Local provider requested but binary was built without `local` feature. \
+                     Rebuild with: cargo build --release --features local"
+                );
+                continue;
+            }
         } else {
             Arc::new(OpenAiCompatProvider::new(name, &base_url, &api_key))
         };
@@ -97,6 +115,24 @@ pub fn build_from_config(config: &rustedclaw_config::AppConfig) -> ProviderRoute
 
         let provider: Arc<dyn Provider> = if config.default_provider == "anthropic" {
             Arc::new(AnthropicProvider::new(&api_key))
+        } else if config.default_provider == "local" {
+            #[cfg(feature = "local")]
+            {
+                let model = config.default_model.clone();
+                Arc::new(crate::local::LocalProvider::new(&model))
+            }
+            #[cfg(not(feature = "local"))]
+            {
+                tracing::error!(
+                    "Local provider requested but binary was built without `local` feature. \
+                     Rebuild with: cargo build --release --features local"
+                );
+                Arc::new(OpenAiCompatProvider::new(
+                    &config.default_provider,
+                    &base_url,
+                    &api_key,
+                ))
+            }
         } else {
             Arc::new(OpenAiCompatProvider::new(
                 &config.default_provider,
@@ -124,6 +160,7 @@ fn default_base_url(provider_name: &str) -> String {
         "fireworks" => "https://api.fireworks.ai/inference/v1".into(),
         "vllm" => "http://localhost:8000/v1".into(),
         "llamacpp" | "llama.cpp" => "http://localhost:8080/v1".into(),
+        "local" => "local://candle".into(), // No HTTP — runs in-process
         _ => format!("https://{provider_name}.api.example.com/v1"),
     }
 }

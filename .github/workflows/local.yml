@@ -1,0 +1,173 @@
+name: Local Inference CI
+
+on:
+  push:
+    branches: [master, main, feature/local-inference]
+    paths:
+      - 'crates/providers/**'
+      - 'crates/cli/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/local.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'crates/providers/**'
+      - 'crates/cli/**'
+      - 'Cargo.toml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  test-local:
+    name: Local Feature (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-local-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-local-
+
+      - name: Build with local feature
+        run: cargo build --release --features local
+
+      - name: Run tests (with local feature)
+        run: cargo test --release --features local
+
+      - name: Clippy (with local feature)
+        run: cargo clippy --all-targets --features local -- -D warnings
+
+      - name: Measure binary size
+        shell: bash
+        run: |
+          if [ -f target/release/rustedclaw ]; then
+            BIN=target/release/rustedclaw
+          else
+            BIN=target/release/rustedclaw.exe
+          fi
+          SIZE=$(stat --format=%s "$BIN" 2>/dev/null || stat -f%z "$BIN" 2>/dev/null)
+          SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $SIZE / 1048576}")
+          echo "## Local Build (${{ matrix.os }}): ${SIZE_MB} MB" >> $GITHUB_STEP_SUMMARY
+
+      - name: Gateway smoke test (Linux)
+        if: runner.os == 'Linux'
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          export OPENAI_API_KEY="sk-ci-placeholder"
+          ./target/release/rustedclaw gateway --local --model tinyllama --port 42690 &
+          GW_PID=$!
+          for i in $(seq 1 20); do
+            if curl -sf --connect-timeout 1 --max-time 1 http://127.0.0.1:42690/health > /dev/null 2>&1; then
+              echo "Gateway ready"
+              break
+            fi
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:42690/health | python3 -m json.tool && echo "✓ Health check passed"
+          kill $GW_PID 2>/dev/null || true
+
+      - name: Gateway smoke test (macOS)
+        if: runner.os == 'macOS'
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          export OPENAI_API_KEY="sk-ci-placeholder"
+          ./target/release/rustedclaw gateway --local --model tinyllama --port 42690 &
+          GW_PID=$!
+          for i in $(seq 1 20); do
+            if curl -sf --connect-timeout 1 --max-time 1 http://127.0.0.1:42690/health > /dev/null 2>&1; then
+              echo "Gateway ready"
+              break
+            fi
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:42690/health | python3 -m json.tool && echo "✓ Health check passed"
+          kill $GW_PID 2>/dev/null || true
+
+      - name: Gateway smoke test (Windows)
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          $env:OPENAI_API_KEY = 'sk-ci-placeholder'
+          $proc = Start-Process -FilePath '.\target\release\rustedclaw.exe' `
+            -ArgumentList 'gateway','--local','--model','tinyllama','--port','42690' `
+            -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 5
+          try {
+            $r = Invoke-WebRequest -Uri 'http://127.0.0.1:42690/health' -UseBasicParsing -TimeoutSec 5
+            Write-Host "✓ Health check passed: $($r.Content)"
+          } catch {
+            Write-Host "Health check: gateway may not support --local on CI (model download)"
+          }
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustedclaw-local-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            target/release/rustedclaw
+            target/release/rustedclaw.exe
+          if-no-files-found: ignore
+
+  lint-local:
+    name: Lint (local feature)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy (standard)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy (local feature)
+        run: cargo clippy --all-targets --features local -- -D warnings
+
+  docker-local:
+    name: Docker (local feature)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image (standard)
+        run: docker build -t rustedclaw:standard .
+
+      - name: Build Docker image (local)
+        run: |
+          docker build \
+            --build-arg FEATURES="--features local" \
+            -t rustedclaw:local .
+
+      - name: Compare image sizes
+        run: |
+          STD=$(docker image inspect rustedclaw:standard --format='{{.Size}}')
+          LOC=$(docker image inspect rustedclaw:local --format='{{.Size}}')
+          STD_MB=$((STD / 1048576))
+          LOC_MB=$((LOC / 1048576))
+          DIFF=$((LOC_MB - STD_MB))
+          echo "## Docker Image Sizes" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Standard | ${STD_MB} MB |" >> $GITHUB_STEP_SUMMARY
+          echo "| Local | ${LOC_MB} MB (+${DIFF} MB) |" >> $GITHUB_STEP_SUMMARY

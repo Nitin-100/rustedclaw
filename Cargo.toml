@@ -71,6 +71,13 @@ chrono = { version = "0.4", features = ["serde"] }
 # WASM runtime (for plugin sandboxing)
 wasmtime = "28"
 
+# Local inference (Candle — Rust-native ML)
+candle-core = "0.8"
+candle-nn = "0.8"
+candle-transformers = "0.8"
+tokenizers = "0.21"
+hf-hub = "0.4"
+
 # Internal crates
 rustedclaw-core = { path = "crates/core" }
 rustedclaw-config = { path = "crates/config" }

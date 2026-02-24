@@ -48,6 +48,14 @@ enum Commands {
         /// Send a single message instead of entering interactive mode
         #[arg(short, long)]
         message: Option<String>,
+
+        /// Run with local inference (no API key needed, no internet)
+        #[arg(long)]
+        local: bool,
+
+        /// Model to use (e.g. "tinyllama", "smollm:135m", or a path to a .gguf file)
+        #[arg(long)]
+        model: Option<String>,
     },
 
     /// Start the HTTP gateway server
@@ -59,6 +67,14 @@ enum Commands {
         /// Override the host (e.g. 0.0.0.0 for Docker)
         #[arg(long)]
         host: Option<String>,
+
+        /// Run gateway with local inference (no API key needed)
+        #[arg(long)]
+        local: bool,
+
+        /// Model for local inference
+        #[arg(long)]
+        model: Option<String>,
     },
 
     /// Start the full daemon (gateway + channels + cron)
@@ -250,8 +266,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Commands::Onboard => commands::onboard::run().await?,
-        Commands::Agent { message } => commands::agent::run(message).await?,
-        Commands::Gateway { port, host } => commands::gateway::run(port, host).await?,
+        Commands::Agent {
+            message,
+            local,
+            model,
+        } => commands::agent::run(message, local, model).await?,
+        Commands::Gateway {
+            port,
+            host,
+            local,
+            model,
+        } => commands::gateway::run(port, host, local, model).await?,
         Commands::Daemon => commands::daemon::run().await?,
         Commands::Status => commands::status::run().await?,
         Commands::Doctor => commands::doctor::run().await?,

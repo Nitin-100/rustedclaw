@@ -2,7 +2,7 @@ name: Benchmarks
 
 on:
   push:
-    branches: [master, main, ci/benchmarks]
+    branches: [master, main, ci/benchmarks, feature/local-inference]
     paths:
       - 'crates/**'
       - 'Cargo.toml'

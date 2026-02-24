@@ -5,10 +5,14 @@
 
 pub mod anthropic;
 pub mod fallback;
+#[cfg(feature = "local")]
+pub mod local;
 pub mod openai_compat;
 pub mod router;
 
 pub use anthropic::AnthropicProvider;
 pub use fallback::FallbackProvider;
+#[cfg(feature = "local")]
+pub use local::LocalProvider;
 pub use openai_compat::OpenAiCompatProvider;
 pub use router::ProviderRouter;
