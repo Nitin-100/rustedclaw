@@ -103,7 +103,7 @@ $swLoad = [System.Diagnostics.Stopwatch]::StartNew()
 
 for ($i = 1; $i -le $Requests; $i++) {
     try {
-        $r = Invoke-WebRequest -Uri "$baseUrl/v1/status" -UseBasicParsing -TimeoutSec 5
+        $r = Invoke-WebRequest -Uri "$baseUrl/health" -UseBasicParsing -TimeoutSec 5
         if ($r.StatusCode -eq 200) { $passed++ } else { $failed++ }
     } catch {
         $failed++

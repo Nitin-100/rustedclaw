@@ -5,7 +5,7 @@
 <h1 align="center">RustedClaw</h1>
 
 <p align="center">
-  <strong>The only AI agent runtime with built-in local inference.<br>Run models on your hardware — zero API keys, zero internet, zero cost per token.<br>~6.7 MB RAM. 4.21 MB binary. One binary. No dependencies. No sign-ups.</strong>
+  <strong>The only AI agent runtime with built-in local inference.<br>Run models on your hardware — zero API keys, zero internet, zero cost per token.<br>~6.8 MB RAM. 4.27 MB binary. One binary. No dependencies. No sign-ups.</strong>
 </p>
 
 <p align="center">
@@ -14,8 +14,8 @@
   <a href="https://github.com/Nitin-100/rustedclaw/actions/workflows/local.yml"><img src="https://github.com/Nitin-100/rustedclaw/actions/workflows/local.yml/badge.svg" alt="Local Inference CI"></a>
   <a href="https://github.com/Nitin-100/rustedclaw/actions/workflows/release.yml"><img src="https://github.com/Nitin-100/rustedclaw/actions/workflows/release.yml/badge.svg" alt="Release Builds"></a>
   <a href="#-quick-start"><img src="https://img.shields.io/badge/get_started-2_min-brightgreen?style=for-the-badge" alt="Get Started"></a>
-  <a href="#-benchmarks"><img src="https://img.shields.io/badge/RAM-6.68_MB-critical?style=for-the-badge" alt="RAM"></a>
-  <a href="#-benchmarks"><img src="https://img.shields.io/badge/binary-4.21_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>
+  <a href="#-benchmarks"><img src="https://img.shields.io/badge/RAM-6.76_MB-critical?style=for-the-badge" alt="RAM"></a>
+  <a href="#-benchmarks"><img src="https://img.shields.io/badge/binary-4.27_MB-blueviolet?style=for-the-badge" alt="Binary Size"></a>
   <a href="#-local-inference-zero-api-keys-zero-internet"><img src="https://img.shields.io/badge/local_AI-air--gapped-orange?style=for-the-badge" alt="Local Inference"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
 </p>
@@ -56,8 +56,8 @@ CPU-only. Air-gapped. Zero cost.
 <td width="25%" align="center">
 
 **🪶 Absurdly Light**<br>
-6.68 MB idle. 6.9 MB peak under<br>
-6,000+ requests. 18 ms cold start.<br>
+6.76 MB idle. 7.18 MB peak under<br>
+6,000+ requests. 5 ms cold start.<br>
 Your <em>terminal emulator</em> uses more.
 
 </td>
@@ -90,10 +90,10 @@ All numbers measured locally on i7-12700F, 32 GB RAM, Windows 11, NVMe. Reproduc
 
 | Metric | Native (i7-12700F) | Docker "Raspberry Pi" (1 CPU, 256 MB) | Docker "$5 VPS" (1 CPU, 512 MB) | Docker "$10 VPS" (2 CPU, 1 GB) |
 |---|:---:|:---:|:---:|:---:|
-| **Idle RAM** | 6.68 MB | 1.11 MiB | 1.10 MiB | 1.11 MiB |
-| **Post-load RAM** | 6.90 MB | — | — | — |
-| **Throughput (seq)** | 186 req/s | 1,786 req/s | 1,832 req/s | 1,792 req/s |
-| **Throughput (bulk)** | 3,774 req/s | — | — | — |
+| **Idle RAM** | 6.76 MB | 1.20 MiB | 1.20 MiB | 1.38 MiB |
+| **Post-load RAM** | 7.18 MB | 1.54 MiB | 1.50 MiB | 1.73 MiB |
+| **Throughput (seq)** | 204 req/s | 1,873 req/s | 1,845 req/s | 1,684 req/s |
+| **Throughput (bulk)** | 3,484 req/s | — | — | — |
 | **Endpoints** | 11/11 | 11/11 | 11/11 | 11/11 |
 
 ### Local Inference Build (`--features local`)
@@ -105,12 +105,12 @@ All numbers measured locally on i7-12700F, 32 GB RAM, Windows 11, NVMe. Reproduc
 | **Throughput (bulk)** | 3,906 req/s | — | — | — |
 | **Endpoints** | 11/11 | 11/11 | 11/11 | 11/11 |
 
-<sub> Docker cgroup-constrained RSS — the kernel reclaims pages under memory pressure, so reported RSS is lower than on bare metal. Unconstrained native RSS is ~6.7 MB (standard) / ~9.3 MB (local).</sub>
+<sub> Docker cgroup-constrained RSS — the kernel reclaims pages under memory pressure, so reported RSS is lower than on bare metal. Unconstrained native RSS is ~6.8 MB (standard) / ~9.3 MB (local).</sub>
 
 **Machine-independent metrics:**
-- Binary size: **4.21 MB** standard  **7.79 MB** with local inference (release, stripped, `opt-level="z"`, LTO)
+- Binary size: **4.27 MB** standard · **7.79 MB** with local inference (release, stripped, `opt-level="z"`, LTO)
 - Threads: **6** (Tokio `worker_threads=2` + runtime)
-- Cold start: **18 ms** standard  **30 ms** local (i7-12700F + NVMe — expect 30–60 ms on a VPS)
+- Cold start: **5 ms** standard · **30 ms** local (i7-12700F + NVMe — expect 15–30 ms on a VPS)
 - Model presets: **8/8** tested — tinyllama, smollm, smollm:135m, smollm:360m, smollm:1.7b, phi2, qwen:0.5b, qwen:1.5b
 
 > **475 tests**, 0 failures. 0 clippy warnings. 0 fmt diffs.
@@ -126,9 +126,9 @@ Other runtimes make you choose: lightweight *or* featureful, cloud *or* local, s
 | **Local Inference (no API key)** | ✅ Built-in Candle ML engine | ❌ Need Ollama / external setup |
 | **Air-Gapped / Offline** | ✅ Fully offline after first download | ❌ Always need internet |
 | **Cloud Providers** | 11 (OpenAI, Anthropic, Groq, etc.) | 1–28 (varies) |
-| **Binary Size** | **4.21 MB** (7.79 MB with local) | 8 MB – 300 MB |
-| **Idle RAM** | **6.68 MB** | 8 MB – 1.2 GB |
-| **Cold Start** | **18 ms** | 20 ms – 4 s |
+| **Binary Size** | **4.27 MB** (7.79 MB with local) | 8 MB – 300 MB |
+| **Idle RAM** | **6.76 MB** | 8 MB – 1.2 GB |
+| **Cold Start** | **5 ms** | 20 ms – 4 s |
 | **Web UI** | ✅ 11-page embedded SPA | Some have it, some don't |
 | **Agent Patterns** | 4 (ReAct, RAG, Multi-agent, Chat) | 0–1 |
 | **Memory + Search** | SQLite + FTS5 | In-memory or requires Postgres |
@@ -140,7 +140,7 @@ Other runtimes make you choose: lightweight *or* featureful, cloud *or* local, s
 | **Tests** | **475**, 0 failures | Often unpublished |
 | **License** | MIT | Varies |
 
-> **The bottom line:** No other runtime gives you local AI inference + 11 cloud providers + Web UI + agent contracts + cost tracking + memory + 4 agent patterns in a 4 MB binary that runs on 6.68 MB RAM.
+> **The bottom line:** No other runtime gives you local AI inference + 11 cloud providers + Web UI + agent contracts + cost tracking + memory + 4 agent patterns in a 4.27 MB binary that runs on 6.76 MB RAM.
 
 ---
 
@@ -303,10 +303,10 @@ You can also point to any local GGUF file:
 
 ### Building with Local Inference
 
-Local inference is behind a Cargo feature flag — the standard build stays lean at **4.21 MB**. Enable it when you need it:
+Local inference is behind a Cargo feature flag — the standard build stays lean at **4.27 MB**. Enable it when you need it:
 
 ```bash
-# Standard build (no local models, 4.21 MB)
+# Standard build (no local models, 4.27 MB)
 cargo build --release
 
 # Local inference build (adds Candle ML engine, 7.79 MB)

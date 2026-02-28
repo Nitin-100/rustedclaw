@@ -306,11 +306,18 @@ impl RateLimiter {
 
 /// Rate limiting middleware — extracts client key from Authorization header or
 /// falls back to "anonymous". Returns 429 Too Many Requests when exceeded.
+/// The /health endpoint is exempt from rate limiting so monitoring and
+/// benchmarks can poll it freely.
 async fn rate_limit_middleware(
     limiter: Arc<RateLimiter>,
     req: axum::extract::Request,
     next: Next,
 ) -> Result<axum::response::Response, StatusCode> {
+    // Exempt health endpoint from rate limiting — monitoring / benchmarks need it
+    if req.uri().path() == "/health" {
+        return Ok(next.run(req).await);
+    }
+
     // Use bearer token as client key if present, otherwise "anonymous"
     let client_key = req
         .headers()
