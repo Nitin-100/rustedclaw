@@ -146,7 +146,59 @@ Other runtimes make you choose: lightweight *or* featureful, cloud *or* local, s
 
 ## 🚀 Quick Start
 
-### Option A — Local AI (No API Key Needed)
+### Option A — Download Binary (Fastest)
+
+No Rust toolchain needed. Download a pre-built binary for your platform and run it directly:
+
+**Linux (x86_64):**
+```bash
+curl -LO https://github.com/Nitin-100/rustedclaw/releases/latest/download/rustedclaw-linux-x86_64.tar.gz
+tar xzf rustedclaw-linux-x86_64.tar.gz
+chmod +x rustedclaw
+./rustedclaw onboard
+./rustedclaw gateway
+```
+
+**Linux (ARM64 / Raspberry Pi):**
+```bash
+curl -LO https://github.com/Nitin-100/rustedclaw/releases/latest/download/rustedclaw-linux-arm64.tar.gz
+tar xzf rustedclaw-linux-arm64.tar.gz
+chmod +x rustedclaw
+./rustedclaw onboard
+./rustedclaw gateway
+```
+
+**macOS (Apple Silicon):**
+```bash
+curl -LO https://github.com/Nitin-100/rustedclaw/releases/latest/download/rustedclaw-macos-arm64.tar.gz
+tar xzf rustedclaw-macos-arm64.tar.gz
+chmod +x rustedclaw
+./rustedclaw onboard
+./rustedclaw gateway
+```
+
+**macOS (Intel):**
+```bash
+curl -LO https://github.com/Nitin-100/rustedclaw/releases/latest/download/rustedclaw-macos-x86_64.tar.gz
+tar xzf rustedclaw-macos-x86_64.tar.gz
+chmod +x rustedclaw
+./rustedclaw onboard
+./rustedclaw gateway
+```
+
+**Windows (x86_64):**
+```powershell
+Invoke-WebRequest -Uri https://github.com/Nitin-100/rustedclaw/releases/latest/download/rustedclaw-windows-x86_64.zip -OutFile rustedclaw.zip
+Expand-Archive rustedclaw.zip -DestinationPath .
+.\rustedclaw.exe onboard
+.\rustedclaw.exe gateway
+```
+
+Open **http://localhost:42617** — done. One binary, no dependencies, no sign-ups.
+
+> **Local inference binaries** (with built-in AI models, no API key needed) are also available — look for the `-local` variants on the [Releases page](https://github.com/Nitin-100/rustedclaw/releases).
+
+### Option B — Local AI from Source (No API Key Needed)
 
 ```bash
 git clone https://github.com/Nitin-100/rustedclaw.git && cd rustedclaw
@@ -158,7 +210,7 @@ cargo build --release --features local
 
 Open **http://localhost:42617** — that's it. No API key. No account. The model downloads once (~670 MB) and is cached forever.
 
-### Option B — Cloud Providers
+### Option C — Cloud Providers from Source
 
 ```bash
 git clone https://github.com/Nitin-100/rustedclaw.git && cd rustedclaw
@@ -185,7 +237,7 @@ export OPENAI_API_KEY="sk-..."              # OpenAI
 
 Open **http://localhost:42617** — done. Requires Rust 1.88+.
 
-### Option C — Docker
+### Option D — Docker
 
 ```bash
 git clone https://github.com/Nitin-100/rustedclaw.git && cd rustedclaw
