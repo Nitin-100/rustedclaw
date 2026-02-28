@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 /// Slack channel configuration.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SlackConfig {
     /// Bot token (xoxb-...).
     pub bot_token: String,
@@ -19,6 +19,16 @@ pub struct SlackConfig {
     pub app_token: String,
     /// Allowed member IDs. Empty = deny all, ["*"] = allow all.
     pub allowed_users: Vec<String>,
+}
+
+impl std::fmt::Debug for SlackConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SlackConfig")
+            .field("bot_token", &"[REDACTED]")
+            .field("app_token", &"[REDACTED]")
+            .field("allowed_users", &self.allowed_users)
+            .finish()
+    }
 }
 
 /// Slack channel adapter.

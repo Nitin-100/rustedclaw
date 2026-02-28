@@ -52,8 +52,12 @@ pub trait AuditSink: Send + Sync {
     fn record(&self, entry: &AuditEntry);
 }
 
-/// In-memory audit logger that stores entries in a vector.
-/// Useful for testing and small deployments.
+/// Maximum number of audit entries to keep in memory.
+/// Older entries are evicted when this limit is reached.
+const MAX_AUDIT_ENTRIES: usize = 10_000;
+
+/// In-memory audit logger that stores entries in a bounded vector.
+/// When the log exceeds `MAX_AUDIT_ENTRIES`, the oldest entries are evicted.
 pub struct AuditLogger {
     entries: std::sync::Mutex<Vec<AuditEntry>>,
     sinks: Vec<Box<dyn AuditSink>>,
@@ -93,6 +97,8 @@ impl AuditLogger {
     }
 
     /// Record an audit event.
+    ///
+    /// Entries are bounded to `MAX_AUDIT_ENTRIES`; oldest are evicted.
     pub fn log(
         &self,
         event: AuditEvent,
@@ -110,8 +116,16 @@ impl AuditLogger {
             details,
         };
 
-        // Store in memory
-        self.entries.lock().unwrap().push(entry.clone());
+        // Store in memory with bounded eviction
+        {
+            let mut entries = self.entries.lock().unwrap();
+            if entries.len() >= MAX_AUDIT_ENTRIES {
+                // Remove oldest 10% to avoid frequent evictions
+                let drain_count = MAX_AUDIT_ENTRIES / 10;
+                entries.drain(..drain_count);
+            }
+            entries.push(entry.clone());
+        }
 
         // Forward to sinks
         for sink in &self.sinks {

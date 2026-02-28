@@ -154,6 +154,25 @@ impl TelemetryEngine {
         let trace = Trace::new(conversation_id);
         let id = trace.id.clone();
         let mut traces = self.traces.write().unwrap();
+
+        // Auto-prune completed traces if too many accumulate
+        const MAX_TRACES: usize = 5_000;
+        if traces.len() >= MAX_TRACES {
+            // Remove oldest completed traces first
+            let drain_count = MAX_TRACES / 10;
+            let mut removed = 0;
+            traces.retain(|t| {
+                if removed >= drain_count {
+                    return true;
+                }
+                if t.ended_at.is_some() {
+                    removed += 1;
+                    return false;
+                }
+                true
+            });
+        }
+
         traces.push(trace);
         id
     }

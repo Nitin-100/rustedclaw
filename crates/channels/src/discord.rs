@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 /// Discord channel configuration.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DiscordConfig {
     /// Bot token from Discord Developer Portal.
     pub bot_token: String,
@@ -21,6 +21,17 @@ pub struct DiscordConfig {
     pub guild_filter: Vec<String>,
     /// Channel IDs to listen in. Empty = all channels.
     pub channel_filter: Vec<String>,
+}
+
+impl std::fmt::Debug for DiscordConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DiscordConfig")
+            .field("bot_token", &"[REDACTED]")
+            .field("allowed_users", &self.allowed_users)
+            .field("guild_filter", &self.guild_filter)
+            .field("channel_filter", &self.channel_filter)
+            .finish()
+    }
 }
 
 /// Discord channel adapter.

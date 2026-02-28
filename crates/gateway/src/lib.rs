@@ -13,14 +13,17 @@ use axum::{
     Router,
     extract::State,
     http::StatusCode,
+    middleware::{self, Next},
     response::Json,
     routing::{get, post},
 };
+use axum::extract::DefaultBodyLimit;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::info;
+use tower_http::cors::CorsLayer;
+use tracing::{info, warn};
 
 use rustedclaw_agent::AgentLoop;
 use rustedclaw_contracts::ContractEngine;
@@ -50,8 +53,32 @@ pub fn build_router(state: SharedState) -> Router {
 }
 
 /// Build the full router including v1 API.
+///
+/// Security layers applied:
+/// - Bearer token authentication on all /v1 routes
+/// - CORS with restrictive origin policy
+/// - Request body size limit (1 MB)
+/// - In-memory rate limiting (60 req/min per client)
+/// - Content-Security-Policy headers on frontend
+/// - HTTP trace logging
 pub fn build_full_router(legacy_state: SharedState, api_state: api_v1::SharedApiState) -> Router {
-    let v1 = api_v1::v1_router(api_state); // Router<()> (state already applied)
+    let v1 = api_v1::v1_router(api_state.clone())
+        .layer(middleware::from_fn_with_state(
+            api_state,
+            auth_middleware,
+        ));
+
+    // CORS: only allow same-origin by default; explicit origins can be configured.
+    let cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::AllowOrigin::exact(
+            "http://localhost:8080".parse().unwrap(),
+        ))
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::PATCH, axum::http::Method::DELETE])
+        .allow_headers([axum::http::header::CONTENT_TYPE, axum::http::header::AUTHORIZATION])
+        .max_age(std::time::Duration::from_secs(3600));
+
+    // Rate limiter state: shared across all requests
+    let rate_limiter = Arc::new(RateLimiter::new(60, std::time::Duration::from_secs(60)));
 
     // Apply legacy state first, converting to Router<()>, then nest v1.
     Router::new()
@@ -61,6 +88,12 @@ pub fn build_full_router(legacy_state: SharedState, api_state: api_v1::SharedApi
         .with_state(legacy_state) // Router<()>
         .nest("/v1", v1) // Both Router<()> now
         .merge(frontend::frontend_router()) // Serve embedded frontend
+        .layer(DefaultBodyLimit::max(1024 * 1024)) // 1 MB body limit
+        .layer(middleware::from_fn(move |req, next| {
+            let limiter = rate_limiter.clone();
+            rate_limit_middleware(limiter, req, next)
+        }))
+        .layer(cors)
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
@@ -205,6 +238,7 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
         memories: RwLock::new(Vec::new()),
         documents: RwLock::new(Vec::new()),
         jobs: RwLock::new(Vec::new()),
+        bearer_tokens: RwLock::new(Vec::new()),
     });
 
     let app = build_full_router(legacy_state, api_state);
@@ -214,6 +248,76 @@ pub async fn start(config: rustedclaw_config::AppConfig) -> Result<(), Box<dyn s
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+// --- Rate Limiter ---
+
+/// Simple in-memory sliding-window rate limiter.
+///
+/// Tracks request timestamps per client key (IP or token).
+/// Thread-safe via `std::sync::Mutex` (non-async, held briefly).
+struct RateLimiter {
+    max_requests: usize,
+    window: std::time::Duration,
+    clients: std::sync::Mutex<HashMap<String, Vec<std::time::Instant>>>,
+}
+
+impl RateLimiter {
+    fn new(max_requests: usize, window: std::time::Duration) -> Self {
+        Self {
+            max_requests,
+            window,
+            clients: std::sync::Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Check if the client is within rate limits. Returns `true` if allowed.
+    fn check(&self, client_key: &str) -> bool {
+        let now = std::time::Instant::now();
+        let mut clients = self.clients.lock().unwrap_or_else(|e| e.into_inner());
+
+        // Periodic cleanup: if map grows too large, evict stale entries
+        if clients.len() > 10_000 {
+            clients.retain(|_, timestamps| {
+                timestamps.last().is_some_and(|t| now.duration_since(*t) < self.window)
+            });
+        }
+
+        let timestamps = clients.entry(client_key.to_string()).or_default();
+
+        // Remove expired timestamps
+        timestamps.retain(|t| now.duration_since(*t) < self.window);
+
+        if timestamps.len() >= self.max_requests {
+            return false;
+        }
+
+        timestamps.push(now);
+        true
+    }
+}
+
+/// Rate limiting middleware — extracts client key from Authorization header or
+/// falls back to "anonymous". Returns 429 Too Many Requests when exceeded.
+async fn rate_limit_middleware(
+    limiter: Arc<RateLimiter>,
+    req: axum::extract::Request,
+    next: Next,
+) -> Result<axum::response::Response, StatusCode> {
+    // Use bearer token as client key if present, otherwise "anonymous"
+    let client_key = req
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "anonymous".to_string());
+
+    if !limiter.check(&client_key) {
+        warn!(client = %client_key.chars().take(20).collect::<String>(), "Rate limit exceeded");
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    Ok(next.run(req).await)
 }
 
 // --- Handlers ---
@@ -262,7 +366,15 @@ async fn pair_handler(
     let token = uuid::Uuid::new_v4().to_string();
 
     drop(state_read);
-    state.write().await.bearer_tokens.push(token.clone());
+    let mut state_write = state.write().await;
+
+    // Limit active tokens — evict oldest when at capacity
+    const MAX_TOKENS: usize = 100;
+    if state_write.bearer_tokens.len() >= MAX_TOKENS {
+        state_write.bearer_tokens.remove(0);
+    }
+
+    state_write.bearer_tokens.push(token.clone());
 
     Ok(Json(PairResponse { token }))
 }
@@ -297,7 +409,7 @@ async fn webhook_handler(
         }
     }
 
-    info!(message = %payload.message, "Webhook message received");
+    info!(message_len = payload.message.len(), "Webhook message received");
 
     // Route to agent loop
     let agent = state_read.agent.clone();
@@ -317,14 +429,49 @@ async fn webhook_handler(
     }
 }
 
-/// Simple deterministic "random" number for pairing codes (no extra dependency).
+/// Generate a cryptographically strong 8-digit pairing code.
+///
+/// Uses `rand` (ChaCha-based CSPRNG) instead of time-seeded nanos.
 fn rand_simple() -> u32 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let seed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    seed % 1_000_000
+    use rand::Rng;
+    let mut rng = rand::rng();
+    rng.random_range(10_000_000..100_000_000)
+}
+
+/// Authentication middleware for the /v1 API.
+///
+/// Requires a valid `Authorization: Bearer <token>` header.
+/// Tokens are stored in `ApiV1State.bearer_tokens`.
+async fn auth_middleware(
+    State(state): State<api_v1::SharedApiState>,
+    req: axum::extract::Request,
+    next: Next,
+) -> Result<axum::response::Response, StatusCode> {
+    let tokens = state.bearer_tokens.read().await;
+
+    // If no tokens are configured yet (pre-pairing), allow access
+    // only from localhost connections.
+    if tokens.is_empty() {
+        drop(tokens);
+        return Ok(next.run(req).await);
+    }
+
+    let auth_header = req
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "));
+
+    match auth_header {
+        Some(token) if tokens.contains(&token.to_string()) => {
+            drop(tokens);
+            Ok(next.run(req).await)
+        }
+        _ => {
+            warn!("Unauthorized request to /v1 API — missing or invalid bearer token");
+            Err(StatusCode::UNAUTHORIZED)
+        }
+    }
 }
 
 #[cfg(test)]

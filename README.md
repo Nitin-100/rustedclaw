@@ -74,7 +74,7 @@ MIT licensed — fork it, sell it, ship it.
 **⚡ Production-Ready**<br>
 4 agent patterns. 9 tools. Memory.<br>
 Web UI. Cron. Contracts. Cost tracking.<br>
-474 tests. Not a toy — a runtime.
+475 tests. Not a toy — a runtime.
 
 </td>
 </tr>
@@ -113,7 +113,7 @@ All numbers measured locally on i7-12700F, 32 GB RAM, Windows 11, NVMe. Reproduc
 - Cold start: **18 ms** standard  **30 ms** local (i7-12700F + NVMe — expect 30–60 ms on a VPS)
 - Model presets: **8/8** tested — tinyllama, smollm, smollm:135m, smollm:360m, smollm:1.7b, phi2, qwen:0.5b, qwen:1.5b
 
-> **474 tests**, 0 failures. 0 clippy warnings. 0 fmt diffs.
+> **475 tests**, 0 failures. 0 clippy warnings. 0 fmt diffs.
 
 ---
 
@@ -137,7 +137,7 @@ Other runtimes make you choose: lightweight *or* featureful, cloud *or* local, s
 | **WASM Sandbox** | ✅ | Some |
 | **External Dependencies** | **None** | npm / PostgreSQL / Docker |
 | **Account Required** | **No** | Some require sign-up |
-| **Tests** | **474**, 0 failures | Often unpublished |
+| **Tests** | **475**, 0 failures | Often unpublished |
 | **License** | MIT | Varies |
 
 > **The bottom line:** No other runtime gives you local AI inference + 11 cloud providers + Web UI + agent contracts + cost tracking + memory + 4 agent patterns in a 4 MB binary that runs on 6.68 MB RAM.
@@ -363,7 +363,7 @@ Each model preset maps to its native chat template format:
 | **Scheduled Routines** | Cron-based task automation with add/remove/pause/resume |
 | **Web UI** | 11-page embedded SPA — Dashboard, Chat, Memory, Tools, Contracts, Usage & Cost, Channels, Routines, Jobs, Logs, Settings |
 | **Streaming** | Real SSE for chat, logs, and events |
-| **Security** | Path validation, command sandboxing, WASM tool isolation, configurable autonomy levels |
+| **Security** | AES-256-GCM encryption, rate limiting, HMAC-SHA256 webhooks, path sandboxing, command injection prevention, SSRF blocking, auth middleware, CORS, CSP headers, secret redaction |
 | **Agent Contracts** | Declarative behavior guardrails — deny, confirm, warn, or allow tool calls via TOML rules |
 | **Cost Tracking & Budgets** | Real-time token cost tracking, per-model pricing for 20+ models, daily/monthly/per-request budget limits |
 | **Channels** | CLI, HTTP webhook, WebSocket, Telegram, Slack, Discord |
@@ -556,6 +556,7 @@ Actions: `deny` (block), `confirm` (ask user), `warn` (log + allow), `allow` (ex
 
 Manage at runtime via CLI or REST API:
 
+
 ```bash
 rustedclaw contract list                          # Show all contracts
 rustedclaw contract validate                      # Check for errors
@@ -564,7 +565,80 @@ rustedclaw contract test shell '{"command":"rm -rf /"}'  # Simulate
 
 ---
 
-## 💰 Cost Tracking & Budgets
+## � Security
+
+RustedClaw is hardened with defense-in-depth across every layer. Security is not an afterthought — it's built into the architecture.
+
+### Encryption & Authentication
+
+| Layer | Implementation |
+|---|---|
+| **Secrets at rest** | AES-256-GCM authenticated encryption with 100K-round SHA-256 key derivation |
+| **API authentication** | Bearer token middleware on all `/v1` routes |
+| **Device pairing** | Cryptographic 8-digit codes (CSPRNG) for secure remote access |
+| **Webhook validation** | HMAC-SHA256 signature verification (constant-time comparison) |
+
+### Network Security
+
+| Layer | Implementation |
+|---|---|
+| **CORS** | Restrictive same-origin policy with explicit method/header allowlists |
+| **Rate limiting** | 60 req/min per client, sliding window, auto-cleanup at 10K clients |
+| **Body size limits** | 1 MB max request body on all endpoints |
+| **SSRF prevention** | Blocks `10.x`, `172.16-31.x`, `192.168.x`, `127.x`, `169.254.x`, `[::1]`, IPv6 link-local/ULA, `.local`/`.internal` DNS |
+| **CSP headers** | `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` |
+
+### Tool & Filesystem Sandboxing
+
+| Layer | Implementation |
+|---|---|
+| **Shell commands** | Injection character rejection (`\| ; & $ \` ( )`), explicit allowlist (20 safe commands), 30s timeout, deny-by-default |
+| **File access** | Path canonicalization with symlink resolution, forbidden path defaults (`~/.ssh`, `~/.aws`, `/etc/shadow`, `C:\Windows\System32`, etc.) |
+| **Calculator** | Expression length limit (1000 chars) to prevent ReDoS |
+| **WASM isolation** | Optional sandboxed tool execution via Wasmtime |
+
+### Data Protection
+
+| Layer | Implementation |
+|---|---|
+| **Secret redaction** | Custom `Debug` impls on `AppConfig`, `ProviderConfig`, and all channel configs — API keys/bot tokens print as `[REDACTED]` |
+| **Log hygiene** | User messages logged by length only (not content), pairing codes omitted from structured fields |
+| **SQL injection** | Parameterized queries for tag filtering with wildcard escaping |
+| **Contract regex** | Pattern length limit (200 chars) to prevent catastrophic backtracking |
+
+### DoS & Resource Protection
+
+| Layer | Implementation |
+|---|---|
+| **Conversations** | Capped at 1,000 with LRU eviction |
+| **Memories** | Capped at 10,000 with oldest-10% eviction |
+| **Documents** | Capped at 5,000 with oldest-10% eviction |
+| **Bearer tokens** | Capped at 100 (FIFO eviction) |
+| **Audit log** | Bounded at 10,000 entries with auto-drain |
+| **Telemetry traces** | Auto-pruned at 5,000 (completed traces first) |
+| **Contract engine log** | Bounded at 5,000 entries |
+
+### Configuration
+
+Security defaults are safe out of the box. Key settings in `config.toml`:
+
+```toml
+[autonomy]
+# Shell command allowlist — only these commands can execute
+shell_allowlist = ["ls", "cat", "echo", "git", "cargo"]
+# File access controls
+file_read_forbidden = ["~/.ssh", "~/.aws", "/etc/shadow"]
+file_write_forbidden = ["~/.ssh", "/etc"]
+# Autonomy level: "supervised" | "semi" | "autonomous"
+level = "supervised"
+
+[gateway]
+require_pairing = true    # Require device pairing for API access
+```
+
+---
+
+## �💰 Cost Tracking & Budgets
 
 Real-time token cost tracking with built-in pricing for 20+ models and budget enforcement that stops runaway API spend.
 
@@ -618,7 +692,7 @@ rustedclaw/
 ├── crates/
 │   ├── core/        # Types, traits, errors          (29 tests)
 │   ├── config/      # TOML config + env overrides     (9 tests)
-│   ├── providers/   # LLM providers + local Candle   (42 tests)
+│   ├── providers/   # LLM providers + local Candle   (42+5 tests)
 │   ├── channels/    # Input channels                 (38 tests)
 │   ├── memory/      # SQLite + FTS5                  (49 tests)
 │   ├── tools/       # 9 built-in tools               (67 tests)
@@ -627,13 +701,13 @@ rustedclaw/
 │   ├── contracts/   # Agent behavior contracts        (33 tests)
 │   ├── telemetry/   # Cost tracking, tracing, budgets (29 tests)
 │   ├── workflow/    # Cron engine                    (16 tests)
-│   ├── security/    # Sandboxing + WASM              (40 tests)
+│   ├── security/    # Encryption, sandboxing, audit    (40 tests)
 │   └── cli/         # Binary entry point + commands   (6 + 17 e2e tests)
 ├── frontend/        # Embedded SPA (HTML/CSS/JS)
 ├── scripts/         # Benchmark scripts
 ├── Dockerfile
 ├── docker-compose.yml
-└── 474 tests, 0 failures
+└── 475 tests, 0 failures
 ```
 
 ---

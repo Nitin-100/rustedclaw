@@ -25,8 +25,9 @@ pub enum PathValidationError {
 ///
 /// Checks:
 /// 1. No path traversal attacks (`..\..` sequences)
-/// 2. Path is within allowed roots (if specified)
-/// 3. Path is not in forbidden paths list
+/// 2. Path is canonicalized to resolve symlinks and relative components
+/// 3. Path is within allowed roots (if specified)
+/// 4. Path is not in forbidden paths list
 ///
 /// Returns the canonicalized (resolved) path on success.
 pub fn validate_path(
@@ -36,19 +37,51 @@ pub fn validate_path(
 ) -> Result<PathBuf, PathValidationError> {
     let input_path = Path::new(path);
 
-    // Check for obvious path traversal attempts
+    // Check for obvious path traversal attempts in the raw string
     let path_str = path.replace('\\', "/");
     if path_str.contains("../") || path_str.contains("/..") || path_str == ".." {
         return Err(PathValidationError::PathTraversal { path: path.into() });
     }
 
-    // Check against forbidden paths
+    // Attempt to canonicalize the path to resolve symlinks, `.`, `..`, etc.
+    // If the file doesn't exist yet (e.g., for writes), canonicalize the parent.
+    let canonical = if input_path.exists() {
+        input_path.canonicalize().map_err(|e| {
+            PathValidationError::CanonicalizeFailed {
+                path: path.into(),
+                reason: e.to_string(),
+            }
+        })?
+    } else if let Some(parent) = input_path.parent()
+        && parent.exists()
+    {
+        let canonical_parent = parent.canonicalize().map_err(|e| {
+            PathValidationError::CanonicalizeFailed {
+                path: path.into(),
+                reason: format!("Parent dir: {e}"),
+            }
+        })?;
+        canonical_parent.join(input_path.file_name().unwrap_or_default())
+    } else {
+        // Can't canonicalize — fall back to the raw path but normalize it
+        input_path.to_path_buf()
+    };
+
+    let canonical_str = canonical.to_string_lossy().replace('\\', "/").to_lowercase();
+
+    // Strip the Windows extended-length path prefix (\\?\) that canonicalize() adds.
+    // \\?\ becomes //?/ after backslash replacement
+    let canonical_str = canonical_str
+        .strip_prefix("//?/")
+        .unwrap_or(&canonical_str)
+        .to_string();
+
+    // Check against forbidden paths (using canonical path)
     for forbidden in forbidden_paths {
         let expanded = expand_tilde(forbidden);
         let forbidden_normalized = expanded.replace('\\', "/").to_lowercase();
-        let path_normalized = path_str.to_lowercase();
 
-        if path_normalized.starts_with(&forbidden_normalized) {
+        if canonical_str.starts_with(&forbidden_normalized) {
             return Err(PathValidationError::ForbiddenPath {
                 path: path.into(),
                 pattern: forbidden.clone(),
@@ -56,13 +89,12 @@ pub fn validate_path(
         }
     }
 
-    // Check allowed roots (if any are configured)
+    // Check allowed roots (if any are configured) using canonical path
     if !allowed_roots.is_empty() {
         let is_allowed = allowed_roots.iter().any(|root| {
             let expanded = expand_tilde(root);
             let root_normalized = expanded.replace('\\', "/").to_lowercase();
-            let path_normalized = path_str.to_lowercase();
-            path_normalized.starts_with(&root_normalized)
+            canonical_str.starts_with(&root_normalized)
         });
 
         if !is_allowed {
@@ -70,7 +102,7 @@ pub fn validate_path(
         }
     }
 
-    Ok(input_path.to_path_buf())
+    Ok(canonical)
 }
 
 /// Expand ~ to the user's home directory.

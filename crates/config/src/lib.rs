@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 /// The root configuration structure.
 ///
 /// Maps directly to `~/.rustedclaw/config.toml`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     /// API key (can be overridden per-provider)
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -96,6 +96,49 @@ fn default_temperature() -> f32 {
 }
 fn default_max_tokens() -> u32 {
     4096
+}
+
+/// Redact a secret string for Debug output: show first 4 chars + "***".
+fn redact(s: &Option<String>) -> &'static str {
+    match s {
+        Some(_) => "[REDACTED]",
+        None => "None",
+    }
+}
+
+impl std::fmt::Debug for AppConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AppConfig")
+            .field("api_key", &redact(&self.api_key))
+            .field("default_provider", &self.default_provider)
+            .field("default_model", &self.default_model)
+            .field("default_temperature", &self.default_temperature)
+            .field("default_max_tokens", &self.default_max_tokens)
+            .field("memory", &self.memory)
+            .field("gateway", &self.gateway)
+            .field("autonomy", &self.autonomy)
+            .field("runtime", &self.runtime)
+            .field("providers", &self.providers)
+            .field("channels_config", &self.channels_config)
+            .field("identity", &self.identity)
+            .field("heartbeat", &self.heartbeat)
+            .field("tunnel", &self.tunnel)
+            .field("secrets", &self.secrets)
+            .field("routines", &self.routines)
+            .field("contracts", &self.contracts)
+            .field("telemetry", &self.telemetry)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for ProviderConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProviderConfig")
+            .field("api_key", &redact(&self.api_key))
+            .field("api_url", &self.api_url)
+            .field("default_model", &self.default_model)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -244,7 +287,7 @@ impl Default for RuntimeConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ProviderConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,

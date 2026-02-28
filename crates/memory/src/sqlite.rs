@@ -298,15 +298,22 @@ impl MemoryBackend for SqliteBackend {
                     return Ok(vec![]);
                 }
 
-                // Tag filter: build tag conditions
+                // Tag filter: build tag conditions using parameterized queries
+                // to prevent SQL injection via tag values
                 let tag_filter = if query.tags.is_empty() {
                     String::new()
                 } else {
                     let conditions: Vec<String> = query
                         .tags
                         .iter()
-                        .map(|t| {
-                            format!("m.tags LIKE '%\"{}\",%' OR m.tags LIKE '%\"{}\"]%'", t, t)
+                        .enumerate()
+                        .map(|(i, _)| {
+                            // Use positional bind parameters starting after ?1 and ?2
+                            let param_a = i * 2 + 3;
+                            let param_b = i * 2 + 4;
+                            format!(
+                                "m.tags LIKE ?{param_a} OR m.tags LIKE ?{param_b}"
+                            )
                         })
                         .collect();
                     format!("AND ({})", conditions.join(" OR "))
@@ -324,9 +331,19 @@ impl MemoryBackend for SqliteBackend {
                     "#
                 );
 
-                let rows = sqlx::query(&sql)
+                let mut db_query = sqlx::query(&sql)
                     .bind(&fts_query)
-                    .bind(query.limit as i64)
+                    .bind(query.limit as i64);
+
+                // Bind tag filter parameters (escaped LIKE patterns)
+                for tag in &query.tags {
+                    // Escape SQL LIKE wildcards in tag values
+                    let escaped = tag.replace('%', "\\%").replace('_', "\\_");
+                    db_query = db_query.bind(format!("%\"{escaped}\",%"));
+                    db_query = db_query.bind(format!("%\"{escaped}\"]%"));
+                }
+
+                let rows = db_query
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| MemoryError::QueryFailed(format!("FTS5 search: {e}")))?;

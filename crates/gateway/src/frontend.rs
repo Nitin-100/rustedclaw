@@ -5,8 +5,8 @@
 
 use axum::{
     Router,
-    http::{StatusCode, header},
-    response::{Html, IntoResponse, Response},
+    http::{StatusCode, header, HeaderMap, HeaderValue},
+    response::{IntoResponse, Response},
     routing::get,
 };
 
@@ -15,7 +15,7 @@ const INDEX_HTML: &str = include_str!("../../../frontend/index.html");
 const STYLE_CSS: &str = include_str!("../../../frontend/style.css");
 const APP_JS: &str = include_str!("../../../frontend/app.js");
 
-/// Build a router that serves the embedded frontend.
+/// Build a router that serves the embedded frontend with security headers.
 pub fn frontend_router() -> Router {
     Router::new()
         .route("/", get(index_handler))
@@ -23,14 +23,45 @@ pub fn frontend_router() -> Router {
         .route("/static/app.js", get(js_handler))
 }
 
-async fn index_handler() -> Html<&'static str> {
-    Html(INDEX_HTML)
+/// Security headers applied to all frontend HTML responses.
+fn security_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    headers.insert(
+        header::HeaderName::from_static("content-security-policy"),
+        HeaderValue::from_static(
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; frame-ancestors 'none'; form-action 'self'",
+        ),
+    );
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::X_FRAME_OPTIONS,
+        HeaderValue::from_static("DENY"),
+    );
+    headers.insert(
+        header::HeaderName::from_static("referrer-policy"),
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    headers
+}
+
+async fn index_handler() -> Response {
+    (StatusCode::OK, security_headers(), INDEX_HTML).into_response()
 }
 
 async fn css_handler() -> Response {
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+        ],
         STYLE_CSS,
     )
         .into_response()
@@ -39,10 +70,13 @@ async fn css_handler() -> Response {
 async fn js_handler() -> Response {
     (
         StatusCode::OK,
-        [(
-            header::CONTENT_TYPE,
-            "application/javascript; charset=utf-8",
-        )],
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+        ],
         APP_JS,
     )
         .into_response()

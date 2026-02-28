@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 /// Telegram channel configuration.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TelegramConfig {
     /// Bot token from @BotFather.
     pub bot_token: String,
@@ -19,6 +19,16 @@ pub struct TelegramConfig {
     pub allowed_users: Vec<String>,
     /// Whether to use webhook mode instead of long polling.
     pub use_webhook: bool,
+}
+
+impl std::fmt::Debug for TelegramConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TelegramConfig")
+            .field("bot_token", &"[REDACTED]")
+            .field("allowed_users", &self.allowed_users)
+            .field("use_webhook", &self.use_webhook)
+            .finish()
+    }
 }
 
 /// Telegram channel adapter.

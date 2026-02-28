@@ -4,19 +4,42 @@ use async_trait::async_trait;
 use rustedclaw_core::error::ToolError;
 use rustedclaw_core::tool::{Tool, ToolResult};
 
+/// Returns a list of sensitive paths that should be blocked by default.
+fn default_forbidden_paths() -> Vec<String> {
+    vec![
+        "~/.ssh".into(),
+        "~/.gnupg".into(),
+        "~/.aws".into(),
+        "~/.azure".into(),
+        "~/.gcloud".into(),
+        "~/.config/gcloud".into(),
+        "~/.docker".into(),
+        "~/.kube".into(),
+        "/etc".into(),
+        "/usr".into(),
+        "/root".into(),
+        "/boot".into(),
+        "C:\\Windows".into(),
+        "C:\\Program Files".into(),
+    ]
+}
+
 pub struct FileWriteTool {
-    /// Allowed root directories. Empty = allow all.
+    /// Allowed root directories. Empty = allow all (but forbidden paths still apply).
     pub allowed_roots: Vec<String>,
     /// Forbidden path prefixes.
     pub forbidden_paths: Vec<String>,
 }
 
 impl FileWriteTool {
-    /// Create a file write tool with no path restrictions.
+    /// Create a file write tool with secure default restrictions.
+    ///
+    /// By default, blocks writes to sensitive system paths:
+    /// `~/.ssh`, `~/.gnupg`, `~/.aws`, `/etc`, `/usr`, etc.
     pub fn new() -> Self {
         Self {
             allowed_roots: Vec::new(),
-            forbidden_paths: Vec::new(),
+            forbidden_paths: default_forbidden_paths(),
         }
     }
 

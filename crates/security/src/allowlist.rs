@@ -98,6 +98,13 @@ impl AllowlistPolicy {
 }
 
 /// Check if a URL targets a private/internal IP address.
+///
+/// Blocks:
+/// - localhost / 127.x.x.x (loopback)
+/// - 10.x.x.x, 172.16-31.x.x, 192.168.x.x (RFC 1918 private)
+/// - 169.254.x.x (link-local, including cloud metadata at 169.254.169.254)
+/// - fc00::/7, fe80::/10, ::1 (IPv6 private/link-local/loopback)
+/// - 0.0.0.0 (wildcard)
 fn is_private_url(url: &str) -> bool {
     let lower = url.to_lowercase();
 
@@ -112,19 +119,26 @@ fn is_private_url(url: &str) -> bool {
 
     // Check for private IP ranges and localhost
     host == "localhost"
-        || host == "127.0.0.1"
-        || host.starts_with("10.")
-        || host.starts_with("192.168.")
+        || host.starts_with("127.")              // Full 127.0.0.0/8 loopback
+        || host.starts_with("10.")               // 10.0.0.0/8
+        || host.starts_with("192.168.")           // 192.168.0.0/16
         || host.starts_with("172.16.")
         || host.starts_with("172.17.")
         || host.starts_with("172.18.")
         || host.starts_with("172.19.")
-        || host.starts_with("172.2")
+        || host.starts_with("172.2")              // 172.20-29
         || host.starts_with("172.30.")
         || host.starts_with("172.31.")
-        || host == "169.254.169.254" // AWS metadata
-        || host == "[::1]"
+        || host.starts_with("169.254.")           // Full 169.254.0.0/16 link-local
+        || host == "[::1]"                        // IPv6 loopback
+        || host.starts_with("[fe80:")             // IPv6 link-local
+        || host.starts_with("[fc")                // IPv6 ULA (fc00::/7)
+        || host.starts_with("[fd")                // IPv6 ULA (fc00::/7)
         || host == "0.0.0.0"
+        || host == "[::]"
+        || host.ends_with(".internal")            // Common internal DNS suffixes
+        || host.ends_with(".local")
+        || host.ends_with(".localhost")
 }
 
 #[cfg(test)]

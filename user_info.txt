@@ -1,0 +1,4 @@
+Name: Alice
+Occupation: Software Engineer
+Location: San Francisco
+Interests: Traveling to Paris, Eating French cuisine

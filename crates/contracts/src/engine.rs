@@ -64,6 +64,9 @@ pub struct ContractLogEntry {
     pub timestamp: DateTime<Utc>,
 }
 
+/// Maximum contract log entries kept in memory.
+const MAX_CONTRACT_LOG: usize = 5_000;
+
 /// The contract enforcement engine.
 ///
 /// Thread-safe.  Holds and evaluates a [`ContractSet`] against incoming
@@ -72,7 +75,7 @@ pub struct ContractEngine {
     contracts: RwLock<ContractSet>,
     /// Parsed condition cache — indexed by contract name.
     conditions: RwLock<Vec<(String, Condition)>>,
-    /// Evaluation log.
+    /// Evaluation log (bounded to MAX_CONTRACT_LOG entries).
     log: RwLock<Vec<ContractLogEntry>>,
 }
 
@@ -259,7 +262,7 @@ impl ContractEngine {
                     }
                 }
 
-                // Log the evaluation.
+                // Log the evaluation (bounded).
                 let entry = ContractLogEntry {
                     contract_name: contract.name.clone(),
                     trigger: String::from(contract.trigger.clone()),
@@ -267,7 +270,13 @@ impl ContractEngine {
                     tool_name: tool_name.map(String::from),
                     timestamp: Utc::now(),
                 };
-                self.log.write().unwrap().push(entry);
+                {
+                    let mut log = self.log.write().unwrap();
+                    if log.len() >= MAX_CONTRACT_LOG {
+                        log.drain(..MAX_CONTRACT_LOG / 10);
+                    }
+                    log.push(entry);
+                }
 
                 return verdict;
             }

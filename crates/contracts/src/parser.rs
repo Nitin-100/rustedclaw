@@ -80,7 +80,8 @@ pub enum Op {
 #[derive(Debug, Clone)]
 pub enum Value {
     Str(String),
-    Num(f64),
+    /// Numeric value with cached string representation (avoids memory leaks).
+    Num(f64, String),
 }
 
 impl Condition {
@@ -118,12 +119,19 @@ impl Atom {
                 .is_none_or(|fv| !fv.contains(self.value.as_str())),
             Op::Matches => {
                 let pattern = self.value.as_str();
+                // Limit regex pattern length to prevent ReDoS
+                if pattern.len() > 200 {
+                    return false;
+                }
                 field_value
                     .as_deref()
                     .is_some_and(|fv| Regex::new(pattern).is_ok_and(|re| re.is_match(fv)))
             }
             Op::NotMatches => {
                 let pattern = self.value.as_str();
+                if pattern.len() > 200 {
+                    return true;
+                }
                 field_value
                     .as_deref()
                     .is_none_or(|fv| Regex::new(pattern).is_ok_and(|re| !re.is_match(fv)))
@@ -142,14 +150,14 @@ impl Atom {
                 .is_none_or(|fv| !fv.ends_with(self.value.as_str())),
             Op::Eq => match (&field_value, &self.value) {
                 (Some(fv), Value::Str(s)) => fv == s,
-                (Some(fv), Value::Num(n)) => fv
+                (Some(fv), Value::Num(n, _)) => fv
                     .parse::<f64>()
                     .is_ok_and(|x| (x - n).abs() < f64::EPSILON),
                 (None, _) => false,
             },
             Op::NotEq => match (&field_value, &self.value) {
                 (Some(fv), Value::Str(s)) => fv != s,
-                (Some(fv), Value::Num(n)) => fv
+                (Some(fv), Value::Num(n, _)) => fv
                     .parse::<f64>()
                     .is_ok_and(|x| (x - n).abs() >= f64::EPSILON),
                 (None, _) => true,
@@ -184,7 +192,7 @@ impl Atom {
 
     fn compare_num(&self, field_value: &Option<String>, cmp: impl Fn(f64, f64) -> bool) -> bool {
         match (&field_value, &self.value) {
-            (Some(fv), Value::Num(n)) => fv.parse::<f64>().is_ok_and(|x| cmp(x, *n)),
+            (Some(fv), Value::Num(n, _)) => fv.parse::<f64>().is_ok_and(|x| cmp(x, *n)),
             _ => false,
         }
     }
@@ -194,12 +202,7 @@ impl Value {
     fn as_str(&self) -> &str {
         match self {
             Value::Str(s) => s,
-            Value::Num(n) => {
-                // This is a workaround — numeric values rarely appear in
-                // string comparisons, but if they do, we convert.
-                // We use a leaked &str for simplicity — only happens in edge cases.
-                Box::leak(n.to_string().into_boxed_str())
-            }
+            Value::Num(_, cached) => cached.as_str(),
         }
     }
 }
@@ -486,7 +489,7 @@ fn parse_base_op(tokens: &[Token]) -> Result<(Op, &[Token]), String> {
 fn parse_value(tokens: &[Token]) -> Result<(Value, &[Token]), String> {
     match tokens.first() {
         Some(Token::Str(s)) => Ok((Value::Str(s.clone()), &tokens[1..])),
-        Some(Token::Num(n)) => Ok((Value::Num(*n), &tokens[1..])),
+        Some(Token::Num(n)) => Ok((Value::Num(*n, n.to_string()), &tokens[1..])),
         Some(Token::Ident(s)) => {
             // Bare identifier as a string value.
             Ok((Value::Str(s.clone()), &tokens[1..]))

@@ -8,6 +8,9 @@ use async_trait::async_trait;
 use rustedclaw_core::error::ToolError;
 use rustedclaw_core::tool::{Tool, ToolResult};
 
+/// Maximum expression length to prevent DoS via deeply nested/huge expressions.
+const MAX_EXPRESSION_LENGTH: usize = 1000;
+
 pub struct CalculatorTool;
 
 #[async_trait]
@@ -37,6 +40,20 @@ impl Tool for CalculatorTool {
         let expr = arguments["expression"]
             .as_str()
             .ok_or_else(|| ToolError::InvalidArguments("Missing 'expression' argument".into()))?;
+
+        // Reject excessively long expressions to prevent DoS
+        if expr.len() > MAX_EXPRESSION_LENGTH {
+            return Ok(ToolResult {
+                call_id: String::new(),
+                success: false,
+                output: format!(
+                    "Expression too long ({} chars, max {})",
+                    expr.len(),
+                    MAX_EXPRESSION_LENGTH
+                ),
+                data: None,
+            });
+        }
 
         match evaluate(expr) {
             Ok(value) => {

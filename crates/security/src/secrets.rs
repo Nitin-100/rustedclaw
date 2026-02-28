@@ -1,50 +1,94 @@
-//! Simple secrets encryption using XOR-based obfuscation with key derivation.
+//! Secrets encryption using AES-256-GCM with SHA-256-based key derivation.
 //!
-//! In production, this would use AES-256-GCM with a proper KDF. For the MVP,
-//! we use a simpler approach that still provides meaningful protection of
-//! secrets at rest (not plaintext in config files).
+//! Provides authenticated encryption for API keys and credentials at rest.
+//! Uses AES-256-GCM for confidentiality + integrity, with a SHA-256 based
+//! key derivation (iterated hashing) from a user passphrase.
 
+use aes_gcm::{
+    Aes256Gcm, KeyInit, Nonce,
+    aead::Aead,
+};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// An encrypted value with its nonce.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EncryptedValue {
-    /// Random nonce used for encryption
+    /// 12-byte random nonce used for AES-GCM encryption
     pub nonce: Vec<u8>,
-    /// The encrypted ciphertext
+    /// The AES-256-GCM ciphertext (includes 16-byte auth tag)
     pub ciphertext: Vec<u8>,
 }
 
-/// Manages encryption/decryption of secrets.
+/// Manages encryption/decryption of secrets using AES-256-GCM.
 pub struct SecretsManager {
-    key: Vec<u8>,
+    key: [u8; 32],
 }
 
 impl SecretsManager {
     /// Create a new SecretsManager from a password/passphrase.
     ///
-    /// Derives a 32-byte key from the password using a simple
-    /// hash-based key derivation. In production, use PBKDF2 or Argon2.
+    /// Derives a 32-byte key using iterated SHA-256 hashing (100,000 rounds).
+    /// Rejects empty passwords to prevent weak keys.
     pub fn new(password: &str) -> Self {
+        assert!(
+            !password.is_empty(),
+            "SecretsManager password must not be empty"
+        );
         let key = derive_key(password);
         Self { key }
     }
 
-    /// Create a SecretsManager from raw key bytes.
+    /// Create a SecretsManager from raw 32-byte key material.
+    ///
+    /// Panics if key is not exactly 32 bytes.
     pub fn from_key(key: Vec<u8>) -> Self {
-        Self { key }
+        assert_eq!(key.len(), 32, "Key must be exactly 32 bytes for AES-256");
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&key);
+        Self { key: arr }
     }
 
-    /// Encrypt a plaintext string.
+    /// Encrypt a plaintext string using AES-256-GCM.
+    ///
+    /// Each call generates a fresh random 12-byte nonce, ensuring that
+    /// encrypting the same plaintext twice produces different ciphertexts.
+    /// The ciphertext includes a 16-byte authentication tag.
     pub fn encrypt(&self, plaintext: &str) -> EncryptedValue {
-        let nonce = generate_nonce();
-        let ciphertext = xor_encrypt(plaintext.as_bytes(), &self.key, &nonce);
-        EncryptedValue { nonce, ciphertext }
+        let cipher = Aes256Gcm::new_from_slice(&self.key)
+            .expect("AES-256-GCM key init should not fail with 32-byte key");
+        let nonce_bytes = generate_nonce();
+        let nonce = Nonce::from_slice(&nonce_bytes);
+        let ciphertext = cipher
+            .encrypt(nonce, plaintext.as_bytes())
+            .expect("AES-256-GCM encryption should not fail");
+        EncryptedValue {
+            nonce: nonce_bytes.to_vec(),
+            ciphertext,
+        }
     }
 
-    /// Decrypt an encrypted value back to plaintext.
+    /// Decrypt an encrypted value back to plaintext using AES-256-GCM.
+    ///
+    /// Returns an error if the key is wrong or the ciphertext was tampered with
+    /// (authenticated encryption detects modification).
     pub fn decrypt(&self, encrypted: &EncryptedValue) -> Result<String, SecretError> {
-        let plaintext_bytes = xor_encrypt(&encrypted.ciphertext, &self.key, &encrypted.nonce);
+        if encrypted.nonce.len() != 12 {
+            return Err(SecretError::DecryptionFailed(format!(
+                "Invalid nonce length: expected 12, got {}",
+                encrypted.nonce.len()
+            )));
+        }
+        let cipher = Aes256Gcm::new_from_slice(&self.key)
+            .map_err(|e| SecretError::DecryptionFailed(format!("Key init failed: {e}")))?;
+        let nonce = Nonce::from_slice(&encrypted.nonce);
+        let plaintext_bytes = cipher
+            .decrypt(nonce, encrypted.ciphertext.as_ref())
+            .map_err(|_| {
+                SecretError::DecryptionFailed(
+                    "Decryption failed — wrong key or corrupted ciphertext".into(),
+                )
+            })?;
         String::from_utf8(plaintext_bytes)
             .map_err(|_| SecretError::DecryptionFailed("Invalid UTF-8 after decryption".into()))
     }
@@ -65,73 +109,37 @@ pub enum SecretError {
     KeyDerivationFailed(String),
 }
 
-/// Derive a 32-byte key from a password using repeated hashing.
-fn derive_key(password: &str) -> Vec<u8> {
-    let mut key = vec![0u8; 32];
-    let bytes = password.as_bytes();
+/// Derive a 32-byte AES key from a password using iterated SHA-256.
+///
+/// Performs 100,000 rounds of SHA-256 hashing to slow down brute-force attacks.
+/// A unique salt is mixed in to prevent rainbow table attacks.
+fn derive_key(password: &str) -> [u8; 32] {
+    let salt = b"rustedclaw-secrets-v1-salt";
+    let mut hash = Sha256::new();
+    hash.update(salt);
+    hash.update(password.as_bytes());
+    let mut result = hash.finalize();
 
-    // Simple key derivation: hash the password bytes into a 32-byte key
-    for (i, &b) in bytes.iter().enumerate() {
-        key[i % 32] ^= b;
-        // Mix with position to avoid collisions
-        key[(i + 13) % 32] =
-            key[(i + 13) % 32].wrapping_add(b.wrapping_mul((i as u8).wrapping_add(1)));
+    // Iterated hashing — 100k rounds for brute-force resistance
+    for _ in 0..100_000 {
+        let mut h = Sha256::new();
+        h.update(result);
+        h.update(password.as_bytes());
+        result = h.finalize();
     }
 
-    // Additional mixing rounds for better distribution
-    for round in 0..64 {
-        for i in 0..32 {
-            let prev = key[(i + 31) % 32];
-            key[i] = key[i]
-                .wrapping_add(prev)
-                .wrapping_mul(37)
-                .wrapping_add(round);
-        }
-    }
-
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&result);
     key
 }
 
-/// Generate a random nonce.
-fn generate_nonce() -> Vec<u8> {
+/// Generate a cryptographically random 12-byte nonce for AES-GCM.
+fn generate_nonce() -> [u8; 12] {
     use rand::Rng;
     let mut rng = rand::rng();
-    let mut nonce = vec![0u8; 12];
-    rng.fill(&mut nonce[..]);
+    let mut nonce = [0u8; 12];
+    rng.fill(&mut nonce);
     nonce
-}
-
-/// XOR-based stream cipher using key + nonce to generate keystream.
-fn xor_encrypt(data: &[u8], key: &[u8], nonce: &[u8]) -> Vec<u8> {
-    // Generate a keystream from key + nonce
-    let mut keystream = Vec::with_capacity(data.len());
-    let mut state = [0u8; 32];
-    state[..key.len().min(32)].copy_from_slice(&key[..key.len().min(32)]);
-
-    // Mix nonce into state
-    for (i, &n) in nonce.iter().enumerate() {
-        state[i % 32] ^= n;
-    }
-
-    let mut counter = 0u32;
-    while keystream.len() < data.len() {
-        // Generate block from state + counter
-        let counter_bytes = counter.to_le_bytes();
-        for i in 0..32 {
-            let ks_byte = state[i]
-                .wrapping_add(counter_bytes[i % 4])
-                .wrapping_mul(state[(i + 1) % 32].wrapping_add(1))
-                .wrapping_add(i as u8);
-            keystream.push(ks_byte);
-        }
-        counter += 1;
-    }
-
-    // XOR data with keystream
-    data.iter()
-        .zip(keystream.iter())
-        .map(|(&d, &k)| d ^ k)
-        .collect()
 }
 
 #[cfg(test)]
@@ -169,18 +177,15 @@ mod tests {
     }
 
     #[test]
-    fn wrong_password_gives_wrong_output() {
+    fn wrong_password_fails_to_decrypt() {
         let manager1 = SecretsManager::new("correct-password");
         let manager2 = SecretsManager::new("wrong-password");
 
         let encrypted = manager1.encrypt("my-api-key");
         let result = manager2.decrypt(&encrypted);
 
-        // Should decrypt but to wrong value (XOR-based cipher doesn't fail on wrong key)
-        if let Ok(val) = result {
-            assert_ne!(val, "my-api-key");
-        }
-        // Err case (UTF-8 decode error) is also valid
+        // AES-GCM authenticated encryption: wrong key always returns Err
+        assert!(result.is_err(), "Wrong key must fail with AES-GCM");
     }
 
     #[test]

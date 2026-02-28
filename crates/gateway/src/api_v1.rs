@@ -45,6 +45,17 @@ use rustedclaw_telemetry::TelemetryEngine;
 
 // ── State ─────────────────────────────────────────────────────────────────
 
+/// Maximum number of in-memory conversations before oldest are evicted.
+const MAX_CONVERSATIONS: usize = 1_000;
+/// Maximum number of in-memory memory entries.
+const MAX_MEMORIES: usize = 10_000;
+/// Maximum number of in-memory document entries.
+const MAX_DOCUMENTS: usize = 5_000;
+/// Maximum number of in-memory job entries.
+const MAX_JOBS: usize = 1_000;
+/// Maximum number of active bearer tokens.
+const MAX_BEARER_TOKENS: usize = 100;
+
 /// Shared state for the v1 API.
 pub struct ApiV1State {
     pub provider: Arc<dyn Provider>,
@@ -62,6 +73,8 @@ pub struct ApiV1State {
     pub memories: RwLock<Vec<MemoryEntry>>,
     pub documents: RwLock<Vec<DocumentEntry>>,
     pub jobs: RwLock<Vec<JobEntry>>,
+    /// Bearer tokens for API authentication.
+    pub bearer_tokens: RwLock<Vec<String>>,
 }
 
 pub type SharedApiState = Arc<ApiV1State>;
@@ -284,6 +297,18 @@ async fn chat_handler(
         .unwrap_or_else(|| ConversationId::new().to_string());
 
     let mut conversations = state.conversations.write().await;
+
+    // Evict oldest conversation if at capacity
+    if conversations.len() >= MAX_CONVERSATIONS && !conversations.contains_key(&conv_id) {
+        if let Some(oldest_key) = conversations
+            .iter()
+            .min_by_key(|(_, c)| c.created_at)
+            .map(|(k, _)| k.clone())
+        {
+            conversations.remove(&oldest_key);
+        }
+    }
+
     let conv = conversations
         .entry(conv_id.clone())
         .or_insert_with(Conversation::new);
@@ -470,6 +495,18 @@ async fn chat_stream_handler(
         .unwrap_or_else(|| ConversationId::new().to_string());
 
     let mut conversations = state.conversations.write().await;
+
+    // Evict oldest conversation if at capacity
+    if conversations.len() >= MAX_CONVERSATIONS && !conversations.contains_key(&conv_id) {
+        if let Some(oldest_key) = conversations
+            .iter()
+            .min_by_key(|(_, c)| c.created_at)
+            .map(|(k, _)| k.clone())
+        {
+            conversations.remove(&oldest_key);
+        }
+    }
+
     let conv = conversations
         .entry(conv_id.clone())
         .or_insert_with(Conversation::new);
@@ -686,7 +723,20 @@ async fn create_conversation_handler(
     let id = conv.id.to_string();
     let created = conv.created_at.to_rfc3339();
 
-    state.conversations.write().await.insert(id.clone(), conv);
+    let mut conversations = state.conversations.write().await;
+
+    // Evict oldest if at capacity
+    if conversations.len() >= MAX_CONVERSATIONS {
+        if let Some(oldest_key) = conversations
+            .iter()
+            .min_by_key(|(_, c)| c.created_at)
+            .map(|(k, _)| k.clone())
+        {
+            conversations.remove(&oldest_key);
+        }
+    }
+
+    conversations.insert(id.clone(), conv);
 
     (
         StatusCode::CREATED,
@@ -1155,7 +1205,17 @@ async fn ingest_document_handler(
         created_at: chrono::Utc::now(),
     };
 
-    state.documents.write().await.push(entry);
+    let mut documents = state.documents.write().await;
+
+    // Evict oldest 10% if at capacity
+    if documents.len() >= MAX_DOCUMENTS {
+        let drain_count = MAX_DOCUMENTS / 10;
+        // Sort by created_at to remove oldest
+        documents.sort_by_key(|d| d.created_at);
+        documents.drain(..drain_count);
+    }
+
+    documents.push(entry);
 
     (
         StatusCode::CREATED,
@@ -1242,7 +1302,16 @@ async fn create_memory_handler(
         embedding: None,
     };
 
-    state.memories.write().await.push(entry);
+    let mut memories = state.memories.write().await;
+
+    // Evict oldest 10% if at capacity
+    if memories.len() >= MAX_MEMORIES {
+        let drain_count = MAX_MEMORIES / 10;
+        memories.sort_by_key(|m| m.created_at);
+        memories.drain(..drain_count);
+    }
+
+    memories.push(entry);
 
     (
         StatusCode::CREATED,
@@ -1948,6 +2017,7 @@ mod tests {
             memories: RwLock::new(Vec::new()),
             documents: RwLock::new(Vec::new()),
             jobs: RwLock::new(Vec::new()),
+            bearer_tokens: RwLock::new(Vec::new()),
         })
     }
 

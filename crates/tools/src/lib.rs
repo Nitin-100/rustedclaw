@@ -28,9 +28,21 @@ pub use wasm_tool::{
 };
 
 /// Create a default tool registry with all built-in tools.
+///
+/// Security defaults:
+/// - Shell: only common safe commands (ls, cat, echo, git, pwd, etc.)
+/// - File read/write: sensitive paths (~/.ssh, /etc/shadow, etc.) are blocked
 pub fn default_registry() -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    registry.register(Box::new(shell::ShellTool::new(vec![])));
+    // Secure shell allowlist — only common safe commands
+    let safe_commands = vec![
+        "ls".into(), "dir".into(), "cat".into(), "head".into(), "tail".into(),
+        "echo".into(), "pwd".into(), "date".into(), "whoami".into(),
+        "wc".into(), "grep".into(), "find".into(), "which".into(),
+        "git".into(), "cargo".into(), "rustc".into(), "node".into(),
+        "npm".into(), "python".into(), "pip".into(),
+    ];
+    registry.register(Box::new(shell::ShellTool::new(safe_commands)));
     registry.register(Box::new(file_read::FileReadTool::new()));
     registry.register(Box::new(file_write::FileWriteTool::new()));
     registry.register(Box::new(web_search::WebSearchTool));

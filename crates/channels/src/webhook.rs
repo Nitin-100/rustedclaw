@@ -62,20 +62,39 @@ impl WebhookChannel {
     }
 
     /// Validate an HMAC-SHA256 signature against the shared secret.
+    ///
+    /// The expected format is a hex-encoded HMAC-SHA256 digest, e.g.:
+    /// `sha256=<hex_digest>` or just `<hex_digest>`.
+    ///
+    /// Uses constant-time comparison to prevent timing attacks.
     pub fn validate_signature(&self, payload: &[u8], signature: &str) -> bool {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+
+        type HmacSha256 = Hmac<Sha256>;
 
         match &self.config.shared_secret {
             None => true, // No secret configured = no validation
+            Some(secret) if secret.is_empty() => true,
             Some(secret) => {
-                // Simple hash-based validation (in production: use hmac-sha256)
-                let mut hasher = DefaultHasher::new();
-                secret.hash(&mut hasher);
-                payload.hash(&mut hasher);
-                let expected = format!("{:x}", hasher.finish());
-                // Compare first 16 chars for stub
-                signature.len() >= 16 && expected.starts_with(&signature[..16.min(signature.len())])
+                // Strip optional "sha256=" prefix
+                let sig_hex = signature
+                    .strip_prefix("sha256=")
+                    .unwrap_or(signature);
+
+                // Decode the provided signature from hex
+                let provided_bytes = match hex::decode(sig_hex) {
+                    Ok(b) => b,
+                    Err(_) => return false, // Invalid hex = reject
+                };
+
+                // Compute the expected HMAC-SHA256
+                let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+                    .expect("HMAC accepts any key length");
+                mac.update(payload);
+
+                // Constant-time comparison via `verify_slice`
+                mac.verify_slice(&provided_bytes).is_ok()
             }
         }
     }
