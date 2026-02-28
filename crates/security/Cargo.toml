@@ -3,6 +3,11 @@ name = "rustedclaw-security"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Security policies, encryption, allowlists, and audit logging for RustedClaw"
 
 [dependencies]

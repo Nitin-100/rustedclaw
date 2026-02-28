@@ -3,6 +3,11 @@ name = "rustedclaw-telemetry"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Execution tracing, cost tracking and budget enforcement for RustedClaw agents"
 
 [dependencies]

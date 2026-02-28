@@ -21,7 +21,10 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/Nitin-100/rustedclaw"
+homepage = "https://github.com/Nitin-100/rustedclaw"
 rust-version = "1.88"
+keywords = ["ai", "agent", "llm", "runtime", "inference"]
+categories = ["command-line-utilities", "web-programming", "science"]
 
 [workspace.dependencies]
 # Async runtime

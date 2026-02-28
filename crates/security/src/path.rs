@@ -85,7 +85,22 @@ pub fn validate_path(
         let expanded = expand_tilde(forbidden);
         let forbidden_normalized = expanded.replace('\\', "/").to_lowercase();
 
-        if canonical_str.starts_with(&forbidden_normalized) {
+        // Also canonicalize the forbidden path itself so symlinks are resolved
+        // (e.g., on macOS /etc is a symlink to /private/etc)
+        let forbidden_canonical = Path::new(&expanded)
+            .canonicalize()
+            .map(|p| {
+                let s = p.to_string_lossy().replace('\\', "/").to_lowercase();
+                s.strip_prefix("//?/").unwrap_or(&s).to_string()
+            })
+            .ok();
+
+        let is_forbidden = canonical_str.starts_with(&forbidden_normalized)
+            || forbidden_canonical
+                .as_ref()
+                .is_some_and(|fc| canonical_str.starts_with(fc));
+
+        if is_forbidden {
             return Err(PathValidationError::ForbiddenPath {
                 path: path.into(),
                 pattern: forbidden.clone(),
@@ -98,7 +113,20 @@ pub fn validate_path(
         let is_allowed = allowed_roots.iter().any(|root| {
             let expanded = expand_tilde(root);
             let root_normalized = expanded.replace('\\', "/").to_lowercase();
+
+            // Also canonicalize the allowed root for symlink resolution
+            let root_canonical = Path::new(&expanded)
+                .canonicalize()
+                .map(|p| {
+                    let s = p.to_string_lossy().replace('\\', "/").to_lowercase();
+                    s.strip_prefix("//?/").unwrap_or(&s).to_string()
+                })
+                .ok();
+
             canonical_str.starts_with(&root_normalized)
+                || root_canonical
+                    .as_ref()
+                    .is_some_and(|rc| canonical_str.starts_with(rc))
         });
 
         if !is_allowed {
