@@ -9,6 +9,7 @@
 pub mod api_v1;
 pub mod frontend;
 
+use axum::extract::DefaultBodyLimit;
 use axum::{
     Router,
     extract::State,
@@ -17,7 +18,6 @@ use axum::{
     response::Json,
     routing::{get, post},
 };
-use axum::extract::DefaultBodyLimit;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -63,18 +63,23 @@ pub fn build_router(state: SharedState) -> Router {
 /// - HTTP trace logging
 pub fn build_full_router(legacy_state: SharedState, api_state: api_v1::SharedApiState) -> Router {
     let v1 = api_v1::v1_router(api_state.clone())
-        .layer(middleware::from_fn_with_state(
-            api_state,
-            auth_middleware,
-        ));
+        .layer(middleware::from_fn_with_state(api_state, auth_middleware));
 
     // CORS: only allow same-origin by default; explicit origins can be configured.
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::AllowOrigin::exact(
             "http://localhost:8080".parse().unwrap(),
         ))
-        .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::PATCH, axum::http::Method::DELETE])
-        .allow_headers([axum::http::header::CONTENT_TYPE, axum::http::header::AUTHORIZATION])
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PATCH,
+            axum::http::Method::DELETE,
+        ])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::AUTHORIZATION,
+        ])
         .max_age(std::time::Duration::from_secs(3600));
 
     // Rate limiter state: shared across all requests
@@ -279,7 +284,9 @@ impl RateLimiter {
         // Periodic cleanup: if map grows too large, evict stale entries
         if clients.len() > 10_000 {
             clients.retain(|_, timestamps| {
-                timestamps.last().is_some_and(|t| now.duration_since(*t) < self.window)
+                timestamps
+                    .last()
+                    .is_some_and(|t| now.duration_since(*t) < self.window)
             });
         }
 
@@ -409,7 +416,10 @@ async fn webhook_handler(
         }
     }
 
-    info!(message_len = payload.message.len(), "Webhook message received");
+    info!(
+        message_len = payload.message.len(),
+        "Webhook message received"
+    );
 
     // Route to agent loop
     let agent = state_read.agent.clone();

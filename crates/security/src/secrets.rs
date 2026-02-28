@@ -4,10 +4,7 @@
 //! Uses AES-256-GCM for confidentiality + integrity, with a SHA-256 based
 //! key derivation (iterated hashing) from a user passphrase.
 
-use aes_gcm::{
-    Aes256Gcm, KeyInit, Nonce,
-    aead::Aead,
-};
+use aes_gcm::{Aes256Gcm, KeyInit, Nonce, aead::Aead};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 

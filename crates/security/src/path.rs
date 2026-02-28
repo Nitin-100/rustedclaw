@@ -46,28 +46,32 @@ pub fn validate_path(
     // Attempt to canonicalize the path to resolve symlinks, `.`, `..`, etc.
     // If the file doesn't exist yet (e.g., for writes), canonicalize the parent.
     let canonical = if input_path.exists() {
-        input_path.canonicalize().map_err(|e| {
-            PathValidationError::CanonicalizeFailed {
+        input_path
+            .canonicalize()
+            .map_err(|e| PathValidationError::CanonicalizeFailed {
                 path: path.into(),
                 reason: e.to_string(),
-            }
-        })?
+            })?
     } else if let Some(parent) = input_path.parent()
         && parent.exists()
     {
-        let canonical_parent = parent.canonicalize().map_err(|e| {
-            PathValidationError::CanonicalizeFailed {
-                path: path.into(),
-                reason: format!("Parent dir: {e}"),
-            }
-        })?;
+        let canonical_parent =
+            parent
+                .canonicalize()
+                .map_err(|e| PathValidationError::CanonicalizeFailed {
+                    path: path.into(),
+                    reason: format!("Parent dir: {e}"),
+                })?;
         canonical_parent.join(input_path.file_name().unwrap_or_default())
     } else {
         // Can't canonicalize — fall back to the raw path but normalize it
         input_path.to_path_buf()
     };
 
-    let canonical_str = canonical.to_string_lossy().replace('\\', "/").to_lowercase();
+    let canonical_str = canonical
+        .to_string_lossy()
+        .replace('\\', "/")
+        .to_lowercase();
 
     // Strip the Windows extended-length path prefix (\\?\) that canonicalize() adds.
     // \\?\ becomes //?/ after backslash replacement

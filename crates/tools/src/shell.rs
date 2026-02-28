@@ -14,7 +14,7 @@ use tracing::{debug, warn};
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Characters that indicate shell injection attempts.
-const DANGEROUS_CHARS: &[char] = &['|', ';', '&', '`', '$', '(', ')', '{', '}', '<', '>',  '\n'];
+const DANGEROUS_CHARS: &[char] = &['|', ';', '&', '`', '$', '(', ')', '{', '}', '<', '>', '\n'];
 
 /// Execute shell commands with safety constraints.
 pub struct ShellTool {
@@ -56,16 +56,19 @@ impl ShellTool {
 
         // Block shell injection characters (pipes, subshells, semicolons, etc.)
         if command.chars().any(|c| DANGEROUS_CHARS.contains(&c)) {
-            return Err(format!(
+            return Err(
                 "Command contains forbidden shell metacharacters. \
                  Pipes (|), semicolons (;), subshells ($(), ``), and redirects (<, >) are not allowed. \
                  Run each command separately."
-            ));
+                    .to_string(),
+            );
         }
 
         // Deny-by-default: empty allowlist means nothing is permitted
         if self.allowed_commands.is_empty() {
-            return Err("No commands are allowed (empty allowlist — configure allowed_commands)".into());
+            return Err(
+                "No commands are allowed (empty allowlist — configure allowed_commands)".into(),
+            );
         }
 
         // Extract the base command (first word)

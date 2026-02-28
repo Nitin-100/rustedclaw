@@ -78,9 +78,7 @@ impl WebhookChannel {
             Some(secret) if secret.is_empty() => true,
             Some(secret) => {
                 // Strip optional "sha256=" prefix
-                let sig_hex = signature
-                    .strip_prefix("sha256=")
-                    .unwrap_or(signature);
+                let sig_hex = signature.strip_prefix("sha256=").unwrap_or(signature);
 
                 // Decode the provided signature from hex
                 let provided_bytes = match hex::decode(sig_hex) {

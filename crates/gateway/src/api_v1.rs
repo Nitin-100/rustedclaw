@@ -51,10 +51,6 @@ const MAX_CONVERSATIONS: usize = 1_000;
 const MAX_MEMORIES: usize = 10_000;
 /// Maximum number of in-memory document entries.
 const MAX_DOCUMENTS: usize = 5_000;
-/// Maximum number of in-memory job entries.
-const MAX_JOBS: usize = 1_000;
-/// Maximum number of active bearer tokens.
-const MAX_BEARER_TOKENS: usize = 100;
 
 /// Shared state for the v1 API.
 pub struct ApiV1State {
@@ -299,14 +295,14 @@ async fn chat_handler(
     let mut conversations = state.conversations.write().await;
 
     // Evict oldest conversation if at capacity
-    if conversations.len() >= MAX_CONVERSATIONS && !conversations.contains_key(&conv_id) {
-        if let Some(oldest_key) = conversations
+    if conversations.len() >= MAX_CONVERSATIONS
+        && !conversations.contains_key(&conv_id)
+        && let Some(oldest_key) = conversations
             .iter()
             .min_by_key(|(_, c)| c.created_at)
             .map(|(k, _)| k.clone())
-        {
-            conversations.remove(&oldest_key);
-        }
+    {
+        conversations.remove(&oldest_key);
     }
 
     let conv = conversations
@@ -497,14 +493,14 @@ async fn chat_stream_handler(
     let mut conversations = state.conversations.write().await;
 
     // Evict oldest conversation if at capacity
-    if conversations.len() >= MAX_CONVERSATIONS && !conversations.contains_key(&conv_id) {
-        if let Some(oldest_key) = conversations
+    if conversations.len() >= MAX_CONVERSATIONS
+        && !conversations.contains_key(&conv_id)
+        && let Some(oldest_key) = conversations
             .iter()
             .min_by_key(|(_, c)| c.created_at)
             .map(|(k, _)| k.clone())
-        {
-            conversations.remove(&oldest_key);
-        }
+    {
+        conversations.remove(&oldest_key);
     }
 
     let conv = conversations
@@ -726,14 +722,13 @@ async fn create_conversation_handler(
     let mut conversations = state.conversations.write().await;
 
     // Evict oldest if at capacity
-    if conversations.len() >= MAX_CONVERSATIONS {
-        if let Some(oldest_key) = conversations
+    if conversations.len() >= MAX_CONVERSATIONS
+        && let Some(oldest_key) = conversations
             .iter()
             .min_by_key(|(_, c)| c.created_at)
             .map(|(k, _)| k.clone())
-        {
-            conversations.remove(&oldest_key);
-        }
+    {
+        conversations.remove(&oldest_key);
     }
 
     conversations.insert(id.clone(), conv);

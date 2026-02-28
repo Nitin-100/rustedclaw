@@ -311,9 +311,7 @@ impl MemoryBackend for SqliteBackend {
                             // Use positional bind parameters starting after ?1 and ?2
                             let param_a = i * 2 + 3;
                             let param_b = i * 2 + 4;
-                            format!(
-                                "m.tags LIKE ?{param_a} OR m.tags LIKE ?{param_b}"
-                            )
+                            format!("m.tags LIKE ?{param_a} OR m.tags LIKE ?{param_b}")
                         })
                         .collect();
                     format!("AND ({})", conditions.join(" OR "))
@@ -331,9 +329,7 @@ impl MemoryBackend for SqliteBackend {
                     "#
                 );
 
-                let mut db_query = sqlx::query(&sql)
-                    .bind(&fts_query)
-                    .bind(query.limit as i64);
+                let mut db_query = sqlx::query(&sql).bind(&fts_query).bind(query.limit as i64);
 
                 // Bind tag filter parameters (escaped LIKE patterns)
                 for tag in &query.tags {
